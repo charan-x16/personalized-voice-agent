@@ -14,8 +14,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -202,6 +202,32 @@ cython_debug/
 # .vscode/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+.pnpm-store/
+*.tsbuildinfo
+next-env.d.ts
+artifacts/frontend-review/
+pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local environment files
+.env*
+!.env.example
+
+# Local API database
+apps/api/*.db
+apps/api/*.db-journal
+apps/api/*.db-shm
+apps/api/*.db-wal
+apps/api/pytest-cache-files-*/
+apps/api/tests/runtime-*/
 
 # Ruff stuff:
 .ruff_cache/
