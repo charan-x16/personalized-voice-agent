@@ -1,194 +1,183 @@
 # Sarvam Voice Agents integration audit
 
-**Audit date:** 2026-09-03  
-**Source policy:** Official Sarvam documentation and Sarvam-owned resources only.
+**Updated:** 9 September 2026
+**Source policy:** Sarvam documentation, the Sarvam dashboard recipe supplied for this workspace,
+and the Sarvam-maintained Python package only.
 
-## Executive conclusion
+## Conclusion
 
-Yes: Sarvam can be the managed voice-agent layer while this application keeps its own database, authentication, customer identity, and business rules. Sarvam officially supports agent variables, on-start/on-end HTTP hooks, and mid-conversation HTTP API tools. Those are the correct integration points for customer-specific data.
+Yes. Sarvam can provide the managed voice-agent runtime while Svara keeps customer identity,
+tenant isolation, business data, and business rules in its own application and database.
 
-The recommended tenancy model is **one reusable, versioned Sarvam agent per use case**, with dynamic context loaded for each authenticated customer. Create separate agents only when the prompt, tools, voice/language policy, compliance policy, or lifecycle differs materially. Do not create one Sarvam agent per end customer by default.
+The implemented default is one committed, version-pinned Sarvam agent per use case. Each live
+session receives customer-specific variables from Svara after Clerk authentication and a
+tenant-scoped database lookup. A separate Sarvam agent is warranted only when a customer needs a
+materially different prompt, voice/language policy, tool set, compliance boundary, staff-access
+boundary, or usage boundary.
 
-There is one important release blocker for this application's custom web voice UI: Sarvam advertises web, API, SDK, and WebSocket sessions, but its public [Deploy with Code](https://docs.sarvam.ai/conversations/deploy/deploy-with-code) page is explicitly a preview. It does not publish the live-session creation endpoint, WebSocket URL, authentication or ephemeral-token flow, audio framing, event schema, SDK package/methods, or initial-variable payload. The only fully described web path is copying a widget snippet from the authenticated Sarvam dashboard. We must obtain the provisioned contract from the dashboard or Sarvam support before enabling the real adapter.
+## Official support versus Svara implementation
 
-## Support status
-
-| Capability | Audit status | Implementation implication |
+| Capability | Status | Boundary |
 | --- | --- | --- |
-| Managed ASR -> LLM -> TTS voice runtime, VAD, interruptions, language switching | **Confirmed** | Sarvam can own speech processing, orchestration, turn-taking, and synthesis. See [runtime](https://docs.sarvam.ai/conversations/build/run-time). |
-| Telephony, web widget, API, and SDK voice channels | **Confirmed as product availability** | Sarvam says voice is generally available on these channels. See [overview](https://docs.sarvam.ai/conversations/overview). |
-| On-start customer-context lookup and on-end result push | **Confirmed** | Point lifecycle hooks at narrowly scoped backend endpoints. See [hooks](https://docs.sarvam.ai/conversations/build/on-start-on-end-hooks). |
-| Mid-call database/business API calls | **Confirmed** | Use an HTTP API tool; supported methods are GET, POST, PUT, PATCH, DELETE. See [API tool](https://docs.sarvam.ai/conversations/build/tools/https-tool). |
-| Input/output variables, tool-readable variables, LLM-context toggle, PII masking/hashing | **Confirmed** | Pass an opaque conversation reference and minimal allowlisted context; keep identifiers/PII out of LLM context where possible. See [variables](https://docs.sarvam.ai/conversations/build/variables-personalization). |
-| Static knowledge-base retrieval | **Confirmed** | Use for policies, product information, and FAQs. Sarvam explicitly says not to use it for personal account data. See [knowledge bases](https://docs.sarvam.ai/conversations/build/knowledge-base). |
-| Dashboard-generated web widget | **Confirmed** | The authenticated dashboard supplies the snippet and controls theme/launcher/agent. No phone number is required. |
-| Custom web session bootstrap and Voice Agents WebSocket | **Preview; contract not public** | Do not guess an endpoint or wire the browser directly. Keep the production provider fail-closed until Sarvam supplies the contract. |
-| Programmatic create/update-agent API and managed Voice Agents SDK | **Preview; no public endpoint/package contract found** | Author and version the first agent in the dashboard. The public REST reference currently covers deployments, campaigns/cohorts, instant outbound, analytics, and BYOK—not agent authoring or live sessions. |
-| Agent versioning and rollback | **Confirmed** | Deploy only committed/tested versions and pin `app_id` plus `app_version`. See [versioning](https://docs.sarvam.ai/conversations/build/agent/versioning). |
-| Code Tools (`sarvam_conv_ai_sdk`) | **Enterprise only** | Not needed for the current database lookup; prefer HTTP API tools. See [Code Tools](https://docs.sarvam.ai/conversations/build/tools/code-tools). |
-| Human handover | **Enterprise today** | Treat as account-gated. DTMF is described as planned, not generally available. |
-| Voice on WhatsApp, text agents, additional IN22 languages | **Enterprise/on request** | Do not include in the base product promise without a contract. |
-| Webhook signing, retry schedule, delivery ordering, and idempotency headers | **Not publicly documented** | Keep handlers idempotent and ask Sarvam for the verification/retry contract before production. |
-| Live-session idempotency, lookup, and reconciliation | **Not publicly documented** | A production adapter needs a durable worker that can resolve timed-out or abandoned bootstrap/termination requests without creating duplicate sessions. |
-| Managed Voice Agents numeric concurrency/CPS limits by plan | **Not publicly documented** | Read the account dashboard/contract; do not reuse Model API limits as Voice Agents limits. |
-| Transcript/recording retention and zero-data-retention terms | **Not sufficiently documented for this deployment** | Obtain written retention/deletion terms before sending production customer data. |
+| Managed ASR -> agent/LLM -> TTS, turn taking, interruptions, multilingual behavior | Officially supported | Sarvam owns the real-time conversational runtime. See the [Voice Agents overview](https://docs.sarvam.ai/conversations/overview). |
+| Web, API, SDK, and telephony channels | Officially supported | Sarvam lists these as deployment channels. |
+| Python Agents SDK and backend-proxy use case | Officially supported | Svara pins `sarvam-conv-ai-sdk==1.1.0`. Sarvam's package describes backend proxies as a supported use case. See the [official package](https://pypi.org/project/sarvam-conv-ai-sdk/1.1.0/). |
+| Per-session agent variables and initial language/message overrides | Official SDK capability | Svara injects only bounded application context into each interaction. |
+| Mid-conversation HTTP tools and code tools | Officially supported | HTTP tools are the normal database/business-API path. Code tools are available on request. See [Code Tools](https://docs.sarvam.ai/conversations/build/tools/code-tools). |
+| Browser microphone/speaker implementation | Svara implementation | The browser sends raw signed 16-bit, mono, 16 kHz PCM to Svara and receives the same PCM format back. |
+| Browser authentication to the relay | Svara implementation | The authenticated BFF returns an encrypted, expiring relay token. The browser moves it into the WebSocket subprotocol header so it is not written into normal URL access logs. Sarvam credentials never reach the browser. |
+| Customer/tenant isolation | Svara implementation | Every session and tool lookup derives tenant/customer scope from authenticated server-side state. Sarvam variables are not an authorization boundary. |
+| Durable multi-worker relay cancellation | Not implemented | Active SDK objects are process-local. Run one relay worker for the current release or add sticky routing/durable session coordination before scaling horizontally. |
+| Domain-specific reservation tools for the current cafe prompt | Implemented in Svara; Sarvam dashboard mapping pending | Availability, create, lookup, reschedule, and cancel APIs plus tenant-scoped database storage are implemented and tested. They must still be configured as API tools on committed agent version 2. |
 
-## What Sarvam handles and what we handle
-
-Sarvam handles the managed real-time loop: speech recognition, LLM reasoning, speech synthesis, VAD/turn-taking, barge-in, selected voice and language behavior, agent prompt/tools/knowledge, telephony or web transport, and Sarvam-side monitoring/analytics. Sarvam documents a 25-minute maximum configurable call length in [Conversation Settings](https://docs.sarvam.ai/conversations/build/conversation-settings), while its [runtime documentation](https://docs.sarvam.ai/conversations/build/run-time) labels human handover as enterprise-only today.
-
-This platform must continue to handle:
-
-- application login and authorization;
-- tenant and customer resolution;
-- the customer database and all business rules;
-- narrow, authenticated tool/hook endpoints;
-- tenant scoping on every lookup and mutation;
-- consent, data minimization, audit logs, and retention policy;
-- session correlation and replay/idempotency protection;
-- UI, BFF, error states, product analytics, and fallback behavior;
-- Sarvam credential storage, rotation, and provider-contract adaptation.
-
-Sarvam states that the models in its managed Voice Agents stack are self-hosted and that data, including PII, remains in India. That is a useful [documented platform claim](https://docs.sarvam.ai/conversations/overview), but it is not a substitute for reviewing the applicable DPA, retention terms, subcontractors, and account contract. Data deliberately sent from Sarvam to our API tools is again governed by our own infrastructure controls.
-
-## Recommended request and data flow
+## Runtime flow
 
 ```text
-Authenticated customer in web app
-  -> Next.js BFF creates an internal voice session
-  -> FastAPI verifies the actor and resolves tenant/customer from our database
-  -> FastAPI creates an opaque, one-session conversation_ref
-  -> provider adapter starts the Sarvam session and supplies only approved variables
-  -> browser audio is carried through the provisioned Sarvam web transport
-  -> Sarvam STT -> agent LLM
-  -> on-start/API tool calls our FastAPI endpoints
-  -> FastAPI resolves conversation_ref -> fixed tenant/customer and queries our DB
-  -> minimal tool result -> Sarvam LLM -> Sarvam TTS -> customer
-  -> on-end hook/outcome callback -> idempotent persistence in our DB
+Customer microphone
+  -> Web Audio capture and 16 kHz PCM conversion
+  -> authenticated Svara WebSocket relay
+  -> official Sarvam Agents SDK
+  -> Sarvam ASR -> agent/LLM
+  -> optional Sarvam HTTP tool -> Svara API -> tenant-scoped database query
+  -> minimal tool result -> Sarvam agent/LLM -> Sarvam TTS
+  -> PCM audio through Svara relay -> browser speaker
 ```
 
-The LLM must never provide a tenant ID, customer ID, arbitrary SQL, or arbitrary database filter. It may supply only business inputs such as an order reference. The backend derives tenant/customer scope from the opaque session reference created after application authentication.
+The browser first creates a voice session through the same-origin Next.js BFF. FastAPI verifies
+the Clerk session, resolves the application user, locks the matching customer, stores only a hash
+of an opaque `conversation_ref`, and returns a short-lived WebSocket relay URL. The encrypted relay
+token carries the opaque reference but does not expose it as plaintext.
 
-Do not use a Sarvam workspace as a replacement for application-level row isolation. Keep our database's tenant/customer checks authoritative. Use one Sarvam workspace per environment by default; use a dedicated workspace for a customer only when provider-side keys, staff access, configuration, or usage attribution must be separated. Sarvam says workspaces still share the organization's credit balance, while a separate organization is required for hard billing separation.
+When the browser connects, FastAPI validates the browser origin, decrypts the token, locks the
+database session, verifies the provider/status/expiry/customer/tenant, and changes the session from
+`ready` to `active`. It then starts `AsyncSamvaadAgent` with the configured organization, workspace,
+agent, committed version, language, greeting, and dynamic variables. Audio, transcript, interrupt,
+and completion events are relayed to the custom UI. The API stores a bounded outcome when the relay
+ends unless a configured Sarvam on-end tool already wrote the first outcome.
 
-## Mapping to the implementation in this repository
+## Values and versioning
 
-The repository already implements the correct security boundary:
+Required backend values are:
 
-| Repository component | Current behavior | Sarvam mapping |
-| --- | --- | --- |
-| [`src/app/api/voice/sessions/route.ts`](../src/app/api/voice/sessions/route.ts) | Authenticated same-origin BFF; accepts only `language`; never returns provider credentials. | Calls our backend session bootstrap. Keep this boundary. |
-| [`apps/api/src/svara_api/api/routes/voice.py`](../apps/api/src/svara_api/api/routes/voice.py) | Resolves the logged-in actor's active customer, creates and stores an opaque `conversation_ref`, enforces one active session, and calls the provider abstraction. | The eventual Sarvam bootstrap must send `conversation_ref` and `preferred_language` as initial agent variables. |
-| [`apps/api/src/svara_api/services/voice_provider.py`](../apps/api/src/svara_api/services/voice_provider.py) | Has `mock` and guarded `sarvam` providers. The Sarvam provider validates server-only config and deliberately returns 503 because the public session contract is missing. | Correct current behavior. Implement only after obtaining the real endpoint/auth/frame/event contract. |
-| [`apps/api/src/svara_api/api/routes/sarvam.py`](../apps/api/src/svara_api/api/routes/sarvam.py) | Implements on-start, `get_order_status`, and on-end endpoints. It derives tenant/customer from `conversation_ref`, binds an optional provider interaction ID, enforces expiry, audits calls, and makes completion first-write-wins. | Configure these as Sarvam lifecycle/API tools after public HTTPS deployment. |
-| [`apps/api/src/svara_api/security.py`](../apps/api/src/svara_api/security.py) | Protects Sarvam-facing endpoints with constant-time validation of `X-Voice-Tool-Key`. | Store the corresponding secret in Sarvam Settings -> Secrets and add it as the API-tool authentication header. |
-| [`src/hooks/use-voice-session.ts`](../src/hooks/use-voice-session.ts) and [`src/lib/voice/unsupported-live-transport.ts`](../src/lib/voice/unsupported-live-transport.ts) | Own provider-neutral microphone/session lifecycle and deliberately reject live transport without constructing a WebSocket. | Replace only the unsupported adapter after the managed web contract is known. |
-
-Current internal endpoint contracts:
-
-```text
-POST /v1/sarvam/hooks/on-start
-X-Voice-Tool-Key: <dedicated secret>
-{ conversation_ref, interaction_id?, metadata? }
-
-POST /v1/sarvam/tools/get-order-status
-X-Voice-Tool-Key: <dedicated secret>
-{ conversation_ref, interaction_id?, order_reference }
-
-POST /v1/sarvam/hooks/on-end
-X-Voice-Tool-Key: <dedicated secret>
-{ conversation_ref, interaction_id?, resolution, summary?, transcript?, final_variables?, duration_seconds? }
+```dotenv
+VOICE_PROVIDER=sarvam
+SARVAM_API_KEY=...
+SARVAM_ORG_ID=...
+SARVAM_WORKSPACE_ID=...
+SARVAM_AGENT_ID=...
+SARVAM_AGENT_VERSION=2
+VOICE_WEBSOCKET_PUBLIC_URL=ws://127.0.0.1:8000/v1/voice/stream
 ```
 
-The published instant-outbound webhook payload is **not shape-compatible** with our on-end request. It uses fields such as `status`, `final_agent_variables`, and transcript turns shaped as `{role, en_text}`. Do not point that webhook directly at `/v1/sarvam/hooks/on-end`; add a verified normalization route if instant outbound is adopted. See the official [instant-outbound webhook schema](https://docs.sarvam.ai/conversations/api/instant-outbound/webhook-payload).
+Production must use `wss://` on the public API host. The agent version is deliberately pinned to a
+committed integer; a draft is not a production target. Changing the draft does not change running
+traffic until the new version is committed and the environment pin is deliberately updated.
 
-## Exact Sarvam dashboard checklist
+The official SDK obtains the Sarvam-signed upstream WebSocket using the configured API key and
+starts the interaction. Svara does not invent or call an undocumented browser endpoint and does
+not expose the signed upstream URL or `X-API-Key` to client JavaScript.
 
-1. Create/select the correct organization and a dedicated **production workspace**. Use a separate staging workspace and separate API keys. Sarvam describes an organization as the billing/identity boundary and a workspace as the project/environment/access boundary in its [Platform FAQ](https://docs.sarvam.ai/api/platform/faq).
-2. In Voice Agents, create one agent for this customer-support use case. Record its Agent ID, commit a version, and test that committed version. The first agent should be authored in the dashboard because the public create/update-agent contract is only previewed.
-3. Configure the voice, starting language, allowed language switching, interruption behavior, quiet-caller nudges, privacy protection, and maximum call length. Keep the maximum at or below both Sarvam's 25-minute cap and our session TTL.
-4. Create these input variables:
-   - `conversation_ref`: opaque per-session correlation value; keep it out of LLM context if the tool builder permits tool-only use.
-   - `preferred_language`: minimal language preference.
-   - `first_name`, `plan_name`, and `open_request_count`: populated by the on-start response; expose to the LLM only when needed.
-5. Create only allowlisted output variables that the application will persist, currently `order_reference`, `follow_up`, and `resolution_code`. Mark PII variables and configure masking/hashing.
-6. Under Settings -> Secrets, store a unique production tool secret corresponding to backend `SARVAM_TOOL_SECRET`. Never reuse the Sarvam Voice Agents API key or the application's session-signing secret.
-7. Add an API tool with lifecycle `on_start`:
-   - method: `POST`;
-   - URL: `https://<api-host>/v1/sarvam/hooks/on-start`;
-   - header: `X-Voice-Tool-Key` from the Sarvam secret store;
-   - JSON body mapped to `conversation_ref`, and to Sarvam's interaction ID/metadata if those fields are exposed by the provisioned builder;
-   - response mappings: `customer.first_name`, `customer.preferred_language`, `customer.plan_name`, `customer.open_request_count`, and `safe_to_continue`.
-8. Add a during-conversation API tool named `get_order_status`:
-   - clear description stating it may run only when the caller asks about an order;
-   - method: `POST`;
-   - URL: `https://<api-host>/v1/sarvam/tools/get-order-status`;
-   - the same secret header;
-   - body fields `conversation_ref`, optional bound `interaction_id`, and model-supplied `order_reference`;
-   - a short pre-run phrase and a tight timeout. Sarvam allows API-tool timeouts up to 30 seconds, but our target should be much lower.
-9. Add an `on_end` lifecycle hook to `https://<api-host>/v1/sarvam/hooks/on-end` with the same secret header. Map the final fields into our normalized schema. Confirm in the actual builder which runtime fields are available for interaction ID, transcript, summary, and duration; the public hook page does not publish an exact template schema.
-10. Allow Sarvam egress to the API. The API-tool page currently lists `4.213.167.70`; confirm the current complete list with Sarvam before production because the BYOK documentation separately says to contact support for current egress IPs.
-11. In Deploy with Code, either copy the dashboard widget snippet for the supported widget path, or obtain the account-specific custom session API/SDK recipe. Never put `X-API-Key` in browser JavaScript. Sarvam explicitly recommends a backend proxy for client-facing WebSockets.
-12. In backend production secrets, set `VOICE_PROVIDER=sarvam`, `SARVAM_API_KEY`, `SARVAM_ORG_ID`, `SARVAM_WORKSPACE_ID`, `SARVAM_AGENT_ID`, and a distinct `SARVAM_TOOL_SECRET`—but switch the provider only after the adapter and end-to-end contract tests are complete.
+## Dynamic customer context
 
-The unresolved critical step is how a web/API session accepts the initial `conversation_ref`. Campaign CSVs and on-start/telephony metadata are documented variable sources, but the public web-session initial-variable payload is not. Require Sarvam to demonstrate this before adopting the widget or custom WebSocket for authenticated personalization.
+Svara currently sends these session variables:
 
-## Public Voice Agents API surface
+- `conversation_ref`: opaque capability used by Svara's tools to resolve the session.
+- `preferred_language`: customer/session language.
+- `user_name` and `customer_name`: resolved from the authenticated customer's record.
+- `customer_plan`: the customer's plan.
+- `service_provider_name`, `service_location`, and `business_hours`: resolved from the tenant's
+  reservation policy, falling back to the workspace name/current-hours guidance when no policy is
+  configured.
+- `agent_display_name`, `agent_tone`, and `customer_instructions`: the saved per-customer agent
+  configuration.
+- `current_date`: the backend's current ISO calendar date for relative-date resolution.
 
-Voice Agents REST calls use `X-API-Key`; the official [API introduction](https://docs.sarvam.ai/conversations/api/introduction) lists these service bases:
+Declare every variable the Sarvam prompt or tool mapping uses in the Sarvam **Variables** screen.
+The prompt must treat these values as context, not proof of authorization. Keep large or frequently
+changing records out of agent variables; retrieve them with a narrow HTTP tool when needed.
 
-- deployments: `https://apps.sarvam.ai/api/app-authoring`;
-- campaigns/cohorts: `https://apps.sarvam.ai/api/scheduling`;
-- instant outbound: `https://apps.sarvam.ai/api/outbounds`;
-- analytics: `https://apps.sarvam.ai/api`.
+## Database tools
 
-Documented examples relevant to this platform:
+The repository exposes these provider-facing routes:
 
-- Create an inbound telephony deployment: `POST https://apps.sarvam.ai/api/app-authoring/v1/orgs/{org_id}/workspaces/{workspace_id}/deployments`, with `name`, `app_id`, `app_version`, and `connection_configs`; see [Create deployment](https://docs.sarvam.ai/conversations/api/deployments/create).
-- Place an instant outbound call: `POST https://apps.sarvam.ai/api/outbounds/v1/orgs/{org_id}/workspaces/{workspace_id}/outbounds`, with `app_config`, `user_config`, and optional `webhook_config`; see [Create outbound call](https://docs.sarvam.ai/conversations/api/instant-outbound/create).
-- Analytics includes attempts, interactions, recordings, and transcripts beneath `https://apps.sarvam.ai/api/analytics/v1/{org_id}/{workspace_id}/{app_id}/...`; see [attempts](https://docs.sarvam.ai/conversations/api/analytics/attempts), [interactions](https://docs.sarvam.ai/conversations/api/analytics/interactions), [recordings](https://docs.sarvam.ai/conversations/api/analytics/recordings), and [transcripts](https://docs.sarvam.ai/conversations/api/analytics/transcripts).
+| Route | Purpose |
+| --- | --- |
+| `POST /v1/sarvam/hooks/on-start` | Returns bounded customer and per-customer agent context. The direct SDK relay already supplies its essential start context, so this hook is optional for the web path. |
+| `POST /v1/sarvam/tools/get-order-status` | Reads one order belonging to the customer bound to the session. |
+| `POST /v1/sarvam/tools/check-availability` | Returns up to five valid table slots near a requested local date/time. |
+| `POST /v1/sarvam/tools/create-reservation` | Atomically creates a customer-scoped reservation and safely replays exact retries. |
+| `POST /v1/sarvam/tools/find-reservation` | Finds a reference or the customer's upcoming confirmed reservations. |
+| `POST /v1/sarvam/tools/reschedule-reservation` | Moves a reservation using a fresh slot and optimistic version check. |
+| `POST /v1/sarvam/tools/cancel-reservation` | Cancels a reservation using an optimistic version check and safely handles retries. |
+| `POST /v1/sarvam/hooks/on-end` | Stores the first bounded outcome and handles retries idempotently. |
 
-These are management/telephony/analytics endpoints. None is a documented inbound browser-session bootstrap.
+These are Svara routes, not Sarvam-defined endpoints. Deploy them on public HTTPS, configure them
+as tools/hooks in the Sarvam dashboard, store `SARVAM_TOOL_SECRET` in Sarvam's secret store, and
+send it as `X-Voice-Tool-Key`. Map `conversation_ref` from the session variable; never ask the model
+to supply tenant or customer IDs.
 
-Authentication has three separate contracts that must not be conflated:
+The reservation routes are implemented, but they are Svara's HTTPS contracts rather than automatic
+Sarvam configuration. Follow the exact request-field and sequencing guide in
+[Sarvam v2 reservation-tool setup](sarvam-v2-reservation-tools.md). Until all five tools are enabled
+on committed agent version 2 and the database migration is applied, the agent must not promise live
+booking actions.
 
-- Voice Agents management REST: `X-API-Key`, backend only.
-- Our Sarvam-facing hook/tool endpoints: application-defined `X-Voice-Tool-Key` stored as a Sarvam workspace secret.
-- Sarvam Model APIs: `api-subscription-key` (or documented Bearer alternative), not the managed Voice Agents header. See [Model API authentication](https://docs.sarvam.ai/api-reference/authentication).
+## Security and isolation
 
-Sarvam's API tool supports no auth, bearer, API key, and basic auth, and stores credential values as masked workspace secrets. Organization policy controls are plan-dependent and can restrict agent creation, production deployment, transcript/recording access, and secret management; see [Policy](https://docs.sarvam.ai/conversations/settings/policy). BYOK is also documented for customer-controlled encryption keys, but public availability/tier and its fit for this account must be confirmed; see [BYOK](https://docs.sarvam.ai/conversations/api/byok/overview).
+- Clerk authenticates the human; FastAPI maps the immutable Clerk user ID to one active
+  application user.
+- The browser may select a language, but never a tenant, customer, agent ID, agent version, provider
+  variable, or tool credential.
+- `conversation_ref` is random, encrypted in transit to the relay, and stored only as a hash.
+- The relay URL is accepted only from configured frontend origins. Remote deployments require TLS
+  for both HTTP and WebSocket traffic.
+- Sarvam API keys, Clerk secret keys, database credentials, and tool secrets remain backend-only.
+- One active session per customer is enforced by the database.
+- Reservation reads and writes derive tenant/customer scope only from the bound voice session.
+  Mutation retries are idempotent, edits use optimistic versions, and PostgreSQL prevents
+  overlapping confirmed bookings for one table. The new reservation tables enable RLS and remove
+  Data API access for Supabase `anon` and `authenticated` roles; the server connects directly with
+  its backend database role.
+- Transcript and outcome storage is bounded, but retention/deletion, at-rest encryption, abuse rate
+  limits, monitoring, and database-level tenant controls remain production work.
 
-## Pricing and limits
+## What Sarvam handles and what Svara handles
 
-- Sarvam's official Epoch announcement says managed Voice Agents are generally available without a waitlist at **₹3.50 per minute**, with authoring, simulation, phone numbers, evaluation, and analytics included. See [Epoch summary](https://www.sarvam.ai/epoch/summary). Confirm taxes, billing rounding, minimums, and what “phone numbers included” means in the account contract.
-- The current public product/API documentation does not provide a detailed managed Voice Agents pricing table or billing-unit definition; ₹3.50/minute is the official announcement figure, not a complete commercial schedule.
-- The telephony docs separately say rented-number prices vary by number, are visible in the dashboard catalog, are deducted from the Sarvam wallet, and renew every 30 calendar days. See [Rent from Sarvam](https://docs.sarvam.ai/conversations/deploy/telephony/rent-from-sarvam). BYOT carrier charges remain with the chosen provider.
-- Billing is organization-level: all workspaces/products consume one credit balance, and there are no per-workspace budgets. Enterprise offers custom pricing, concurrency, throughput, support, and SLAs. See [Billing](https://docs.sarvam.ai/api/platform/billing).
-- Campaign APS/CPS defaults to `2`. Sarvam documents `concurrency ~= APS x connect rate x average talk time`; plan CPS/concurrency is shared across campaigns, instant outbound, and inbound calls. See [Dialing rate and concurrency](https://docs.sarvam.ai/conversations/deploy/campaigns/dialing-rate).
-- Sarvam does **not** publish numeric managed Voice Agents CPS/concurrency ceilings by plan in the public docs. The runtime page's “20,000+ concurrent calls” statement is a platform-scale claim, not an allocation for this account.
-- Sarvam Model API pricing and limits are separate from the managed ₹3.50/minute offering and must not be used to estimate the current managed design.
+Sarvam handles speech recognition, conversational reasoning, speech synthesis, turn behavior,
+selected language/voice configuration, agent instructions, configured knowledge/tools, and its own
+interaction analytics.
 
-## Required answers from Sarvam before live web enablement
+Svara handles the web product, Clerk authentication, customer onboarding, tenant/customer mapping,
+database ownership, per-customer configuration, the browser audio relay, tool authorization,
+business APIs, auditing, conversation persistence, and customer-facing history.
 
-Ask Sarvam support (`developer@sarvam.ai`) or the account team for:
+## Pricing and operational constraints
 
-1. the exact create-session endpoint, method, request/response schemas, agent/version selection rules, idempotency-key support, and lookup/reconciliation API;
-2. the exact WSS URL, handshake auth, audio encoding/sample rate/frame boundaries, client and server event schemas, keepalive, reconnect, and session termination rules;
-3. whether a browser-safe short-lived token exists, its TTL, origin controls, and revocation behavior; otherwise the supported backend proxy pattern;
-4. the official managed Voice Agents SDK package, supported versions, session methods, and compatibility policy;
-5. the supported way to pass signed initial variables/opaque metadata (`conversation_ref`) into widget, API, and SDK sessions;
-6. lifecycle-hook runtime field names and exact body-template syntax for interaction ID, transcript, summary, final variables, and duration;
-7. webhook/tool request signing, retry schedule, timeout behavior, ordering, replay protection, and complete egress IP ranges;
-8. account-specific managed concurrency/CPS, rate-limit responses, maximum web sessions, SLAs, and quota-increase process;
-9. billing rounding, failed/short-call billing, widget/web session billing, number rental/carrier charges, and taxes;
-10. transcript/audio/log retention, deletion APIs, training opt-out, DPA, data residency, ZDR options, and incident commitments.
+- Voice Agent usage and any phone-number/telephony charges are Sarvam account charges. Confirm the
+  current dashboard price, rounding, included features, taxes, and concurrency allocation before
+  production; do not estimate managed Voice Agent costs from separate model-API prices.
+- The configured Svara session lifetime is 1-60 minutes and must not exceed the Sarvam agent's
+  committed runtime limit.
+- The current relay keeps active SDK sessions in one FastAPI process. Use one worker for the first
+  deployment. Horizontal scale needs sticky routing plus shared coordination, or a dedicated relay
+  service.
+- Web Audio microphone capture requires a secure browser context (`https://`), except loopback local
+  development where browsers permit `http://localhost`.
+- The base SDK is enough for this headless relay. The `[all]` extra and PortAudio are needed for a
+  server/desktop process that directly captures or plays audio hardware, not for browser audio.
 
-## Explicit alternative: build the runtime with Model APIs
+## Release checklist
 
-If Sarvam cannot provide a usable managed web-session contract, a separately scoped fallback is to build the voice runtime ourselves using Sarvam Model APIs plus LiveKit or Pipecat. Sarvam publishes runnable official guides for [LiveKit](https://docs.sarvam.ai/api/integration/build-voice-agent-with-live-kit) and [Pipecat](https://docs.sarvam.ai/api/integration/build-voice-agent-with-pipecat). In that design Sarvam supplies STT, the conversational LLM, and TTS, while we own realtime transport, orchestration, tool calling, turn state, retries, recording, and monitoring.
-
-This is **an alternative, not the current implementation**. It has a different authentication contract, separate per-model pricing/rate limits, and materially more operational responsibility. Do not silently substitute it for managed Voice Agents; make it a deliberate architecture decision if the managed contract remains unavailable.
-
-## Decision
-
-Proceed with the existing dynamic-context architecture and the current fail-closed provider boundary. Configure and validate the Sarvam agent, variables, hooks, and HTTP tool in a staging workspace now. Enable live web voice only after the dashboard/account contract proves that a server-created session can carry the opaque `conversation_ref`, gives us a browser-safe or backend-proxied WebSocket protocol, and supports durable reconciliation of uncertain or abandoned session operations.
+1. Keep agent version 2 committed and pinned for the current test.
+2. Declare the variables listed above in the agent version and give safe defaults where appropriate.
+3. Run migration `20260909_0003`, provision each tenant's policy/tables, and configure all five API
+   tools using [the v2 mapping guide](sarvam-v2-reservation-tools.md).
+4. Run FastAPI and Next.js, sign in with a Clerk account linked to an active customer, open `/voice`,
+   allow the microphone, and complete a short test conversation.
+5. Confirm the session appears in `/conversations` and that no API key or plaintext
+   `conversation_ref` appears in browser responses.
+6. Exercise book, lookup, reschedule, cancel, unavailable-slot, and duplicate-retry scenarios in
+   Sarvam's **Tests** screen before committing a replacement agent version.
+7. For staging/production, publish the API over HTTPS/WSS, set exact `FRONTEND_ORIGINS` and
+   `VOICE_WEBSOCKET_HOSTS`, rotate development secrets, run migrations, and add monitoring/rate
+   limits.

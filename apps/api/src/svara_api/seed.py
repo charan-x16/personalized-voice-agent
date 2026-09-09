@@ -1,3 +1,4 @@
+from datetime import time
 from hashlib import sha256
 
 from sqlalchemy import or_, select
@@ -10,10 +11,12 @@ from .agent_configuration import (
     DEFAULT_AGENT_TONE,
 )
 from .models import (
+    CafeTable,
     Customer,
     CustomerAgentConfiguration,
     CustomerOrder,
     CustomerProfileState,
+    ReservationPolicy,
     Tenant,
     User,
 )
@@ -99,6 +102,15 @@ _DEMO_ORDERS = (
         "estimated_arrival": None,
         "delivery_city": "Chennai",
     },
+)
+
+_DEMO_CAFE_TABLES = (
+    ("00000000-0000-4000-8000-000000000020", "T1", 2),
+    ("00000000-0000-4000-8000-000000000021", "T2", 2),
+    ("00000000-0000-4000-8000-000000000022", "T3", 4),
+    ("00000000-0000-4000-8000-000000000023", "T4", 4),
+    ("00000000-0000-4000-8000-000000000024", "T5", 6),
+    ("00000000-0000-4000-8000-000000000025", "T6", 8),
 )
 
 
@@ -218,6 +230,41 @@ async def seed_demo_data(session: AsyncSession) -> None:
                     tone=DEFAULT_AGENT_TONE,
                     instructions=DEFAULT_AGENT_INSTRUCTIONS,
                     revision=1,
+                )
+            )
+    await session.flush()
+
+    reservation_policy = await session.get(ReservationPolicy, tenant.id)
+    if reservation_policy is None:
+        session.add(
+            ReservationPolicy(
+                tenant_id=tenant.id,
+                service_provider_name="By the Brew",
+                service_location="By the Brew",
+                timezone="Asia/Kolkata",
+                opening_time=time(9, 0),
+                closing_time=time(22, 0),
+                slot_interval_minutes=30,
+                reservation_duration_minutes=90,
+                max_party_size=8,
+                advance_booking_days=90,
+            )
+        )
+
+    for table_id, table_name, capacity in _DEMO_CAFE_TABLES:
+        existing_table = await session.scalar(
+            select(CafeTable).where(
+                CafeTable.tenant_id == tenant.id,
+                CafeTable.name == table_name,
+            )
+        )
+        if existing_table is None and await session.get(CafeTable, table_id) is None:
+            session.add(
+                CafeTable(
+                    id=table_id,
+                    tenant_id=tenant.id,
+                    name=table_name,
+                    capacity=capacity,
                 )
             )
     await session.flush()

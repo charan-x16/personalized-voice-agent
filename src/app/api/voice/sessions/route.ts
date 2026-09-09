@@ -58,10 +58,20 @@ export async function POST(request: Request) {
 
   try {
     const payload: unknown = await upstream.json();
-    const allowedWebsocketHosts = process.env.VOICE_WEBSOCKET_HOSTS
+    const configuredWebsocketHosts = process.env.VOICE_WEBSOCKET_HOSTS
       ?.split(",")
       .map((host) => host.trim())
       .filter(Boolean);
+    const backendHost = new URL(
+      process.env.API_BASE_URL ?? "http://127.0.0.1:8000",
+    ).hostname;
+    const allowedWebsocketHosts = Array.from(
+      new Set([
+        ...(configuredWebsocketHosts ?? []),
+        backendHost,
+        ...(process.env.NODE_ENV === "production" ? [] : ["localhost", "127.0.0.1", "[::1]"]),
+      ]),
+    );
     const session = parseVoiceSessionResponse(payload, {
       allowedWebsocketHosts,
       requireWebsocketHostAllowlist: true,

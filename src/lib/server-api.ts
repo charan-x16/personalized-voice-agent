@@ -1,6 +1,6 @@
 import "server-only";
 
-import { cookies } from "next/headers";
+import { auth } from "@clerk/nextjs/server";
 
 import type {
   ConversationDetailResponse,
@@ -18,19 +18,16 @@ import {
   parseCustomerListSearchParams,
   parseMeResponse,
 } from "@/lib/api-validation";
-
-export const SESSION_COOKIE_NAME = "svara_session";
-
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
 const BACKEND_TIMEOUT_MS = 12_000;
 
 export class BackendApiError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
     super(message);
     this.name = "BackendApiError";
+    this.status = status;
   }
 }
 
@@ -107,8 +104,8 @@ export async function requestBackend(
 }
 
 export async function getSessionToken(): Promise<string | null> {
-  const cookieStore = await cookies();
-  return cookieStore.get(SESSION_COOKIE_NAME)?.value ?? null;
+  const { getToken } = await auth();
+  return getToken();
 }
 
 async function readErrorDetail(response: Response): Promise<string> {

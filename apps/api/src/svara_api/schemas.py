@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, time
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
@@ -103,6 +103,123 @@ class OrderStatusResponse(StrictModel):
     status: str
     estimated_arrival: str | None
     delivery_city: str | None
+
+
+class ReservationToolRequest(StrictModel):
+    conversation_ref: str = Field(min_length=24, max_length=256)
+    interaction_id: str | None = Field(default=None, max_length=160)
+
+
+class CheckAvailabilityRequest(ReservationToolRequest):
+    reservation_date: date
+    preferred_time: time
+    party_size: int = Field(ge=1, le=100, strict=True)
+
+    @field_validator("preferred_time")
+    @classmethod
+    def require_local_wall_clock(cls, value: time) -> time:
+        if value.tzinfo is not None:
+            raise ValueError("preferred_time must be a local time without an offset")
+        return value
+
+
+class AvailabilitySlot(StrictModel):
+    start_at: datetime
+    end_at: datetime
+    display_time: str
+
+
+class CheckAvailabilityResponse(StrictModel):
+    available: bool
+    service_location: str
+    timezone: str
+    party_size: int
+    slots: list[AvailabilitySlot] = Field(max_length=5)
+    reason: str | None = None
+
+
+class CreateReservationRequest(ReservationToolRequest):
+    start_at: datetime
+    party_size: int = Field(ge=1, le=100, strict=True)
+    guest_name: str | None = Field(default=None, min_length=1, max_length=160)
+    special_requests: str | None = Field(default=None, max_length=500)
+
+    @field_validator("start_at")
+    @classmethod
+    def require_start_offset(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("start_at must include a timezone offset")
+        return value
+
+    @field_validator("guest_name", "special_requests", mode="before")
+    @classmethod
+    def trim_optional_text(cls, value: object) -> object:
+        if isinstance(value, str):
+            trimmed = value.strip()
+            return trimmed or None
+        return value
+
+
+class FindReservationRequest(ReservationToolRequest):
+    reservation_reference: str | None = Field(default=None, min_length=5, max_length=24)
+
+    @field_validator("reservation_reference", mode="before")
+    @classmethod
+    def normalize_reference(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip().upper()
+        return value
+
+
+class RescheduleReservationRequest(ReservationToolRequest):
+    reservation_reference: str = Field(min_length=5, max_length=24)
+    new_start_at: datetime
+    expected_version: int = Field(ge=1, strict=True)
+
+    @field_validator("reservation_reference", mode="before")
+    @classmethod
+    def normalize_reference(cls, value: object) -> object:
+        return value.strip().upper() if isinstance(value, str) else value
+
+    @field_validator("new_start_at")
+    @classmethod
+    def require_start_offset(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("new_start_at must include a timezone offset")
+        return value
+
+
+class CancelReservationRequest(ReservationToolRequest):
+    reservation_reference: str = Field(min_length=5, max_length=24)
+    expected_version: int = Field(ge=1, strict=True)
+
+    @field_validator("reservation_reference", mode="before")
+    @classmethod
+    def normalize_reference(cls, value: object) -> object:
+        return value.strip().upper() if isinstance(value, str) else value
+
+
+class ReservationDetails(StrictModel):
+    reservation_reference: str
+    status: Literal["confirmed", "cancelled"]
+    guest_name: str
+    party_size: int
+    start_at: datetime
+    end_at: datetime
+    service_location: str
+    timezone: str
+    special_requests: str | None
+    version: int = Field(ge=1)
+
+
+class ReservationMutationResponse(StrictModel):
+    reservation: ReservationDetails
+    idempotent: bool
+
+
+class FindReservationResponse(StrictModel):
+    found: bool
+    reservations: list[ReservationDetails] = Field(max_length=5)
 
 
 class TranscriptTurn(StrictModel):

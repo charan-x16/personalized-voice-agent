@@ -15,6 +15,7 @@ from .services.voice_provider import build_voice_provider
 def create_app(settings: Settings | None = None) -> FastAPI:
     application_settings = settings or get_settings()
     database = Database(application_settings)
+    voice_provider = build_voice_provider(application_settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -30,6 +31,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     await seed_demo_data(session)
             yield
         finally:
+            shutdown = getattr(voice_provider, "shutdown", None)
+            if shutdown is not None:
+                await shutdown()
             await database.dispose()
 
     app = FastAPI(
@@ -40,7 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = application_settings
     app.state.database = database
-    app.state.voice_provider = build_voice_provider(application_settings)
+    app.state.voice_provider = voice_provider
 
     app.add_middleware(
         RequestBodyLimitMiddleware,

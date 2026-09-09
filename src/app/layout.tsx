@@ -1,3 +1,4 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import "@fontsource-variable/instrument-sans";
 import "@fontsource-variable/newsreader";
 import "@fontsource-variable/newsreader/standard-italic.css";
@@ -22,7 +23,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" data-scroll-behavior="smooth">
-      <body>{children}</body>
+      <body>
+        <ClerkProvider>{children}</ClerkProvider>
+      </body>
     </html>
   );
 }

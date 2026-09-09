@@ -677,8 +677,10 @@ function validWebsocketUrl(
 
   try {
     const url = new URL(value);
+    const loopbackHost =
+      url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
     if (
-      url.protocol !== "wss:" ||
+      (url.protocol !== "wss:" && !(url.protocol === "ws:" && loopbackHost)) ||
       !url.hostname ||
       url.username ||
       url.password ||

@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 
 import { Brand } from "@/components/brand";
@@ -81,13 +82,24 @@ export default function LandingPage() {
           <a href="#security">Security</a>
         </nav>
         <div className={styles.headerActions}>
-          <Link className={styles.signInLink} href="/sign-in">
-            Sign in
-          </Link>
-          <Link className={styles.headerCta} href="/voice">
-            Try the voice room
-            <ArrowRight size={15} aria-hidden="true" />
-          </Link>
+          <Show when="signed-out">
+            <SignInButton mode="redirect">
+              <button className={styles.signInLink} type="button">Sign in</button>
+            </SignInButton>
+            <SignUpButton mode="redirect">
+              <button className={styles.headerCta} type="button">
+                Create account
+                <ArrowRight size={15} aria-hidden="true" />
+              </button>
+            </SignUpButton>
+          </Show>
+          <Show when="signed-in">
+            <Link className={styles.headerCta} href="/voice">
+              Open workspace
+              <ArrowRight size={15} aria-hidden="true" />
+            </Link>
+            <UserButton />
+          </Show>
         </div>
       </header>
 

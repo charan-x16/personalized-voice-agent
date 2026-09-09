@@ -156,16 +156,17 @@
   text-align: left;
 }
 
-.avatar {
+.userButton {
   display: grid;
   width: 34px;
   height: 34px;
   place-items: center;
-  background: var(--ink);
-  border-radius: 50%;
-  color: var(--paper);
-  font-size: var(--text-sm);
-  font-weight: 700;
+}
+
+.userButtonAvatar {
+  width: 34px;
+  height: 34px;
+  box-shadow: 0 0 0 1px rgba(23, 23, 20, 0.12);
 }
 
 .profileCopy {

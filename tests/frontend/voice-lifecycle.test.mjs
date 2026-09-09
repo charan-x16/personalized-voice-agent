@@ -22,6 +22,7 @@ import {
   connectionExpiryDelayMilliseconds,
   MAX_CONNECTION_EXPIRY_DELAY_MS,
 } from "../../src/lib/voice/connection-expiry.ts";
+import { WebSocketVoiceTransport } from "../../src/lib/voice/websocket-transport.ts";
 
 const now = Date.parse("2026-03-03T10:00:00.000Z");
 
@@ -123,6 +124,25 @@ test("transport events cannot activate an idle session", () => {
   assert.deepEqual(state, initialVoiceSessionState);
 });
 
+test("live transport is a real websocket adapter and rejects a mismatched contract", async () => {
+  const transport = new WebSocketVoiceTransport();
+  assert.equal(transport.kind, "websocket");
+  assert.equal(transport.supportsTextPrompts, false);
+  await assert.rejects(
+    transport.start({
+      connection: {
+        transport: "mock",
+        websocket_url: null,
+        expires_at: futureIso(15),
+      },
+      microphone: {},
+      signal: new AbortController().signal,
+      onEvent: () => {},
+    }),
+    /Invalid WebSocket transport configuration/,
+  );
+});
+
 test("pagehide makes an active BFCache snapshot terminal", () => {
   let state = voiceSessionReducer(initialVoiceSessionState, { type: "start" });
   state = voiceSessionReducer(state, { type: "microphone-ready" });
@@ -188,8 +208,20 @@ test("BFF-mode websocket validation is fail-closed without an explicit host", ()
   );
 });
 
-test("browser-mode validation checks WSS structure without receiving the server allowlist", () => {
+test("browser-mode validation allows loopback WS but requires WSS for remote hosts", () => {
   assert.ok(parseVoiceSessionResponse(websocketSession(), { now }));
+  assert.ok(
+    parseVoiceSessionResponse(
+      websocketSession({
+        connection: {
+          transport: "websocket",
+          websocket_url: "ws://127.0.0.1:8000/v1/voice/stream?token=ephemeral",
+          expires_at: futureIso(15),
+        },
+      }),
+      { now },
+    ),
+  );
   assert.equal(
     parseVoiceSessionResponse(
       websocketSession({

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import hashlib
@@ -11,9 +12,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import Depends, Header, HTTPException, status
+from clerk_backend_api import AuthenticateRequestOptions, Clerk, authenticate_request
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
+from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .config import Settings
@@ -25,6 +28,7 @@ _BEARER_SCHEME = HTTPBearer(auto_error=False)
 _BASE64URL_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 _TOKEN_CLAIMS = frozenset({"exp", "iat", "sub", "tenant_id"})
 _MAX_TOKEN_LENGTH = 2_048
+_MAX_BEARER_TOKEN_LENGTH = 8_192
 _MAX_CLAIM_LENGTH = 256
 _MAX_TOKEN_LIFETIME_SECONDS = 60 * 60
 _CLOCK_SKEW_SECONDS = 30
@@ -209,24 +213,118 @@ def _unauthorized() -> HTTPException:
     )
 
 
-async def get_current_actor(
-    credentials: Annotated[
-        HTTPAuthorizationCredentials | None,
-        Depends(_BEARER_SCHEME),
-    ],
-    db: Annotated[AsyncSession, Depends(get_db)],
-    settings: Annotated[Settings, Depends(get_app_settings)],
-) -> Actor:
-    """Resolve a signed bearer token to an active, tenant-bound database user."""
+def verify_clerk_session(
+    request: Request,
+    *,
+    settings: Settings,
+) -> str:
+    """Validate a Clerk session token and return its immutable user subject."""
 
-    if credentials is None or credentials.scheme.casefold() != "bearer":
-        raise _unauthorized()
+    if not settings.clerk_secret_key:
+        raise InvalidAccessToken
 
     try:
-        claims = decode_access_token(credentials.credentials, secret=settings.session_secret)
-    except (InvalidAccessToken, UnicodeError, ValueError):
-        raise _unauthorized() from None
+        request_state = authenticate_request(
+            request,
+            AuthenticateRequestOptions(
+                secret_key=settings.clerk_secret_key,
+                jwt_key=settings.clerk_jwt_key,
+                authorized_parties=settings.cors_origins,
+                accepts_token=["session_token"],
+            ),
+        )
+    except Exception as exc:
+        raise InvalidAccessToken from exc
 
+    if not request_state.is_signed_in or not isinstance(request_state.payload, dict):
+        raise InvalidAccessToken
+    subject = request_state.payload.get("sub")
+    if not _is_valid_claim_string(subject):
+        raise InvalidAccessToken
+    return subject
+
+
+async def fetch_clerk_primary_email(
+    subject: str,
+    *,
+    settings: Settings,
+) -> str:
+    """Fetch the verified primary email used for one-time application-user linking."""
+
+    secret_key = settings.clerk_secret_key
+    if not secret_key or not _is_valid_claim_string(subject):
+        raise InvalidAccessToken
+
+    try:
+        async with Clerk(bearer_auth=secret_key, timeout_ms=5_000) as clerk:
+            clerk_user = await clerk.users.get_async(user_id=subject)
+    except Exception as exc:
+        raise InvalidAccessToken from exc
+
+    if clerk_user.banned or clerk_user.locked or clerk_user.deprovisioned:
+        raise InvalidAccessToken
+
+    primary_email_id = clerk_user.primary_email_address_id
+    primary_email = next(
+        (address for address in clerk_user.email_addresses if address.id == primary_email_id),
+        None,
+    )
+    if primary_email is None or primary_email.verification is None:
+        raise InvalidAccessToken
+    verification_status = getattr(primary_email.verification.status, "value", None)
+    if verification_status != "verified":
+        raise InvalidAccessToken
+
+    normalized_email = primary_email.email_address.strip().casefold()
+    if not 3 <= len(normalized_email) <= 254 or "@" not in normalized_email:
+        raise InvalidAccessToken
+    return normalized_email
+
+
+def application_email_candidates(email: str, *, settings: Settings) -> tuple[str, ...]:
+    """Return exact and development-only Clerk test-alias application emails."""
+
+    candidates = [email]
+    if settings.app_env == "production":
+        return tuple(candidates)
+
+    local_part, separator, domain = email.partition("@")
+    base_local_part, marker, test_tag = local_part.partition("+")
+    if (
+        separator
+        and marker
+        and base_local_part
+        and re.fullmatch(r"clerk_test(?:_[a-z0-9-]+)?", test_tag)
+    ):
+        candidates.append(f"{base_local_part}@{domain}")
+    return tuple(candidates)
+
+
+async def _actor_from_user_and_tenant(
+    db: AsyncSession,
+    *,
+    user: User,
+    tenant: Tenant,
+) -> Actor | None:
+    actor_display_name = _normalize_actor_display_name(user.display_name)
+    if actor_display_name is None or not await is_actor_account_eligible(
+        db, user=user, tenant=tenant
+    ):
+        return None
+    return Actor(
+        user_id=user.id,
+        tenant_id=tenant.id,
+        customer_id=user.customer_id,
+        role=user.role,
+        display_name=actor_display_name,
+    )
+
+
+async def _actor_from_internal_claims(
+    db: AsyncSession,
+    *,
+    claims: AccessTokenClaims,
+) -> Actor | None:
     row = (
         await db.execute(
             select(User, Tenant)
@@ -241,22 +339,132 @@ async def get_current_actor(
         )
     ).one_or_none()
     if row is None:
-        raise _unauthorized()
-
+        return None
     user, tenant = row
-    actor_display_name = _normalize_actor_display_name(user.display_name)
-    if actor_display_name is None or not await is_actor_account_eligible(
-        db, user=user, tenant=tenant
-    ):
+    return await _actor_from_user_and_tenant(db, user=user, tenant=tenant)
+
+
+async def _actor_from_clerk_subject(db: AsyncSession, *, subject: str) -> Actor | None:
+    row = (
+        await db.execute(
+            select(User, Tenant)
+            .join(Tenant, Tenant.id == User.tenant_id)
+            .where(
+                User.clerk_user_id == subject,
+                User.is_active.is_(True),
+                Tenant.is_active.is_(True),
+            )
+        )
+    ).one_or_none()
+    if row is None:
+        return None
+    user, tenant = row
+    return await _actor_from_user_and_tenant(db, user=user, tenant=tenant)
+
+
+async def _link_clerk_subject_by_verified_email(
+    db: AsyncSession,
+    *,
+    subject: str,
+    email: str,
+    settings: Settings,
+) -> Actor | None:
+    email_candidates = application_email_candidates(email, settings=settings)
+    rows = (
+        await db.execute(
+            select(User, Tenant)
+            .join(Tenant, Tenant.id == User.tenant_id)
+            .where(
+                func.lower(User.email).in_(email_candidates),
+                User.is_active.is_(True),
+                Tenant.is_active.is_(True),
+            )
+            .limit(2)
+        )
+    ).all()
+    # An email may exist in more than one tenant. Never infer the intended workspace.
+    if len(rows) != 1:
+        return None
+    user, tenant = rows[0]
+    if user.clerk_user_id not in {None, subject}:
+        return None
+
+    actor = await _actor_from_user_and_tenant(db, user=user, tenant=tenant)
+    if actor is None or user.clerk_user_id == subject:
+        return actor
+
+    try:
+        result = await db.execute(
+            update(User)
+            .where(User.id == user.id, User.clerk_user_id.is_(None))
+            .values(clerk_user_id=subject)
+        )
+        if result.rowcount == 1:
+            await db.commit()
+            return actor
+        await db.rollback()
+    except IntegrityError:
+        await db.rollback()
+
+    # A concurrent first request may have completed the same immutable link.
+    concurrent_actor = await _actor_from_clerk_subject(db, subject=subject)
+    if concurrent_actor is not None and concurrent_actor.user_id == user.id:
+        return concurrent_actor
+    return None
+
+
+async def get_current_actor(
+    request: Request,
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Depends(_BEARER_SCHEME),
+    ],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> Actor:
+    """Resolve a signed bearer token to an active, tenant-bound database user."""
+
+    if credentials is None or credentials.scheme.casefold() != "bearer":
         raise _unauthorized()
 
-    return Actor(
-        user_id=user.id,
-        tenant_id=tenant.id,
-        customer_id=user.customer_id,
-        role=user.role,
-        display_name=actor_display_name,
-    )
+    token = credentials.credentials
+    if not token or len(token) > _MAX_BEARER_TOKEN_LENGTH:
+        raise _unauthorized()
+
+    if settings.enable_demo_auth:
+        try:
+            claims = decode_access_token(token, secret=settings.session_secret)
+        except (InvalidAccessToken, UnicodeError, ValueError):
+            pass
+        else:
+            actor = await _actor_from_internal_claims(db, claims=claims)
+            if actor is not None:
+                return actor
+            raise _unauthorized()
+
+    try:
+        clerk_subject = await asyncio.to_thread(
+            verify_clerk_session,
+            request,
+            settings=settings,
+        )
+        actor = await _actor_from_clerk_subject(db, subject=clerk_subject)
+        if actor is None:
+            verified_email = await fetch_clerk_primary_email(
+                clerk_subject,
+                settings=settings,
+            )
+            actor = await _link_clerk_subject_by_verified_email(
+                db,
+                subject=clerk_subject,
+                email=verified_email,
+                settings=settings,
+            )
+    except (InvalidAccessToken, UnicodeError, ValueError):
+        raise _unauthorized() from None
+    if actor is None:
+        raise _unauthorized()
+    return actor
 
 
 async def is_actor_account_eligible(

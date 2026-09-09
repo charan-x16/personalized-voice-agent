@@ -1,9 +1,9 @@
 # Production hardening: customer revisions, agent configuration, and audit events
 
-Phase 3 adds the application controls needed to manage personalized agents safely across
-multiple customers. It does **not** enable Sarvam's live browser audio transport. That remains
-blocked until Sarvam supplies the authenticated session-bootstrap, WebSocket, audio-framing,
-and termination contract described in the [Sarvam integration audit](sarvam-integration-audit.md).
+This guide covers the application controls needed to manage personalized agents safely across
+multiple customers. The live browser transport now uses Sarvam's official Python Agents SDK behind
+an authenticated Svara WebSocket relay. The remaining release controls are described in the
+[Sarvam integration audit](sarvam-integration-audit.md).
 
 ## What this phase adds
 
@@ -160,15 +160,19 @@ not blindly stamp an unknown shared database.
 
 ## Controls still required before production
 
-- Replace demo login and the custom token issuer with the selected production identity provider;
-  map immutable tenant and role claims server-side.
+- Replace automatic first-access email linking with an explicit Clerk invitation/webhook
+  provisioning workflow when one email must belong to multiple tenants, and define the
+  recovery, MFA, and deprovisioning lifecycle.
 - Apply least-privilege database roles, database-level tenant controls where appropriate,
   encrypted backups, retention/deletion policy, and secret rotation.
 - Add rate limits, abuse controls, structured monitoring, and alerting for authentication, tool,
   provider, and database failures.
-- Add a durable worker to reconcile uncertain provider session creation and termination.
-- Obtain and contract-test Sarvam's account-specific web session and audio protocol before
-  enabling the live provider adapter.
+- Add shared active-session coordination and sticky routing (or a dedicated relay service) before
+  running more than one FastAPI worker.
+- Load-test the 16 kHz PCM relay, connection lifecycle, provider errors, and browser interruption
+  behavior against a non-production committed Sarvam agent.
+- Implement the domain-specific availability and reservation APIs expected by the current cafe
+  prompt before exposing those actions to customers.
 - Decide whether audit records require an external immutable archive or tamper-evident signing for
   the applicable compliance regime.
 - If exact conversation replay or regulated evidence is required, persist immutable, retained

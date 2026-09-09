@@ -8,6 +8,7 @@ export default defineConfig([
   globalIgnores([
     ".next/**",
     ".pnpm-store/**",
+    "artifacts/**",
     "apps/api/**",
     "out/**",
     "build/**",

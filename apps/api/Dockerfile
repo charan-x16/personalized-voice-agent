@@ -18,6 +18,7 @@ RUN groupadd --system svara \
 COPY --chown=svara:svara src ./src
 COPY --chown=svara:svara alembic.ini ./alembic.ini
 COPY --chown=svara:svara alembic ./alembic
+COPY --chown=svara:svara certs ./certs
 
 USER svara
 

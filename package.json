@@ -11,9 +11,10 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:unit": "node --experimental-strip-types --test tests/frontend/voice-lifecycle.test.mjs tests/frontend/customer-management.test.mjs tests/frontend/customer-bff-routes.test.mjs tests/frontend/frontend-refinements.test.mjs"
+    "test:unit": "node --experimental-strip-types --test tests/frontend/voice-lifecycle.test.mjs tests/frontend/customer-management.test.mjs tests/frontend/customer-bff-routes.test.mjs tests/frontend/frontend-refinements.test.mjs tests/frontend/clerk-auth.test.mjs"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.9.1",
     "@fontsource-variable/instrument-sans": "latest",
     "@fontsource-variable/newsreader": "latest",
     "lucide-react": "latest",

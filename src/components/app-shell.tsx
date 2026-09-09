@@ -1,5 +1,6 @@
 "use client";
 
+import { useClerk, UserButton } from "@clerk/nextjs";
 import {
   AudioLines,
   History,
@@ -42,6 +43,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { signOut: clerkSignOut } = useClerk();
   const confirmSignOut = useConfirmSignOut();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -119,15 +121,13 @@ export function AppShell({
     setSignOutError(null);
 
     try {
-      const response = await fetch("/api/auth/logout", { method: "POST" });
-      if (!response.ok) throw new Error("Sign out failed");
-      router.replace("/sign-in");
+      await clerkSignOut({ redirectUrl: "/" });
       router.refresh();
     } catch {
       setSignOutError("Could not sign out. Please try again.");
       setIsSigningOut(false);
     }
-  }, [confirmSignOut, isSigningOut, router]);
+  }, [clerkSignOut, confirmSignOut, isSigningOut, router]);
 
   return (
     <div className={styles.shell}>
@@ -199,8 +199,10 @@ export function AppShell({
             </p>
           )}
           <div className={styles.profile}>
-            <span className={styles.avatar} aria-hidden="true">
-              {profile.initials}
+            <span className={styles.userButton}>
+              <UserButton
+                appearance={{ elements: { avatarBox: styles.userButtonAvatar } }}
+              />
             </span>
             <span className={styles.profileCopy}>
               <strong>{profile.full_name}</strong>

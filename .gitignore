@@ -228,6 +228,9 @@ apps/api/*.db-shm
 apps/api/*.db-wal
 apps/api/pytest-cache-files-*/
 apps/api/tests/runtime-*/
+apps/api/.pytest-run-*/
+apps/api/.tmp/
+tmp/
 
 # Ruff stuff:
 .ruff_cache/

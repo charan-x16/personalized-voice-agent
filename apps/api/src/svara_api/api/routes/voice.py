@@ -44,7 +44,7 @@ _MAX_MOCK_TRANSCRIPT_CHARACTERS = 128_000
 _CANCELLATION_TERMINAL_STATUSES = frozenset(
     {"cancelled", "completed", "ended", "expired", "failed"}
 )
-_CANCELLABLE_STATUSES = frozenset({"creating", "ready", "cancelling"})
+_CANCELLABLE_STATUSES = frozenset({"creating", "ready", "active", "cancelling"})
 _DEFAULT_TERMINATION_RETRY_SECONDS = 3
 _DEFAULT_BOOTSTRAP_RETRY_SECONDS = 3
 
@@ -118,7 +118,7 @@ async def _mark_session_failed(
 
         if provider_session_id is not None:
             voice_session.provider_session_id = provider_session_id
-        if voice_session.status in {"creating", "ready"}:
+        if voice_session.status in {"creating", "ready", "active"}:
             voice_session.status = "failed"
             voice_session.active_slot = None
         elif voice_session.status == "cancelling":

@@ -1,18 +1,27 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import sqlite3
 from collections.abc import Iterator, Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
+from zoneinfo import ZoneInfo
 
 import pytest
 from alembic.config import Config
+from fastapi import Request
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
+from sarvam_conv_ai_sdk import AudioEncoding, MsgStatus, Role, ServerAudioChunkMsg
+from sarvam_conv_ai_sdk.messages.events import ServerInteractionConnectedEvent
+from sarvam_conv_ai_sdk.messages.text import ServerTranscriptMsg
 from sqlalchemy import MetaData, create_engine, event
 from sqlalchemy.exc import SQLAlchemyError
+from starlette.websockets import WebSocketDisconnect
 
 from alembic import command
 from svara_api.agent_configuration import (
@@ -27,7 +36,11 @@ from svara_api.database import Database, get_db
 from svara_api.main import create_app
 from svara_api.models import Base, VoiceSession, new_id
 from svara_api.schemas import RuntimeAgentConfiguration
-from svara_api.security import hash_conversation_ref
+from svara_api.security import (
+    application_email_candidates,
+    hash_conversation_ref,
+    verify_clerk_session,
+)
 from svara_api.seed import DEMO_ADMIN_EMAIL, DEMO_ADMIN_USER_ID
 from svara_api.services.voice_provider import (
     SarvamVoiceProvider,
@@ -65,6 +78,49 @@ def _create_session(client: TestClient, token: str, **body: Any) -> dict[str, An
 
 def _tool_headers(key: str = TEST_TOOL_SECRET) -> dict[str, str]:
     return {"X-Voice-Tool-Key": key}
+
+
+def _mock_clerk_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    subject: str = "user_clerk_test_123",
+    email: str,
+) -> list[dict[str, object]]:
+    calls: list[dict[str, object]] = []
+
+    def verify_clerk_session(
+        _request: object,
+        *,
+        settings: Settings,
+    ) -> str:
+        calls.append(
+            {
+                "operation": "verify",
+                "authorized_parties": settings.cors_origins,
+            }
+        )
+        return subject
+
+    async def fetch_clerk_primary_email(
+        received_subject: str,
+        *,
+        settings: Settings,
+    ) -> str:
+        calls.append(
+            {
+                "operation": "fetch-email",
+                "subject": received_subject,
+                "has_secret": bool(settings.clerk_secret_key),
+            }
+        )
+        return email.strip().casefold()
+
+    monkeypatch.setattr("svara_api.security.verify_clerk_session", verify_clerk_session)
+    monkeypatch.setattr(
+        "svara_api.security.fetch_clerk_primary_email",
+        fetch_clerk_primary_email,
+    )
+    return calls
 
 
 def _query_one(
@@ -437,6 +493,132 @@ def test_demo_login_rejects_unknown_user(api: ApiHarness) -> None:
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Invalid credentials"}
+    assert response.headers["www-authenticate"] == "Bearer"
+
+
+def test_clerk_bearer_links_and_resolves_active_application_user(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database_path = tmp_path / "clerk-auth.db"
+    settings = settings_for_database(
+        database_path,
+        enable_demo_auth=False,
+        clerk_secret_key="sk_test_not-a-real-secret",
+    )
+    calls = _mock_clerk_identity(
+        monkeypatch,
+        email="RAHUL+CLERK_TEST_001@EXAMPLE.COM",
+    )
+    app = create_app(settings)
+
+    with TestClient(app) as client:
+        first_response = client.get(
+            "/v1/me",
+            headers={"Authorization": "Bearer clerk-session-token"},
+        )
+        second_response = client.get(
+            "/v1/me",
+            headers={"Authorization": "Bearer clerk-session-token"},
+        )
+
+    assert first_response.status_code == 200, first_response.text
+    assert second_response.status_code == 200, second_response.text
+    assert first_response.json()["email"] == "rahul@example.com"
+    assert first_response.json()["role"] == "customer"
+    assert _query_one(
+        database_path,
+        "SELECT clerk_user_id FROM users WHERE lower(email) = ?",
+        ("rahul@example.com",),
+    ) == ("user_clerk_test_123",)
+    assert calls == [
+        {
+            "operation": "verify",
+            "authorized_parties": ["http://testserver"],
+        },
+        {
+            "operation": "fetch-email",
+            "subject": "user_clerk_test_123",
+            "has_secret": True,
+        },
+        {
+            "operation": "verify",
+            "authorized_parties": ["http://testserver"],
+        },
+    ]
+
+
+def test_clerk_verifier_accepts_only_session_tokens_from_configured_parties(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = settings_for_database(
+        tmp_path / "clerk-verifier.db",
+        enable_demo_auth=False,
+        clerk_secret_key="sk_test_not-a-real-secret",
+        clerk_jwt_key="test-public-key",
+        frontend_origins="https://voice.example,https://admin.example",
+    )
+    captured: dict[str, object] = {}
+
+    def authenticate(request: Request, options: object) -> object:
+        captured.update({"request": request, "options": options})
+        return SimpleNamespace(
+            is_signed_in=True,
+            payload={"sub": "user_clerk_test_123"},
+        )
+
+    monkeypatch.setattr("svara_api.security.authenticate_request", authenticate)
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/v1/me",
+            "headers": [(b"authorization", b"Bearer token")],
+        }
+    )
+
+    assert verify_clerk_session(request, settings=settings) == "user_clerk_test_123"
+    options = captured["options"]
+    assert options.authorized_parties == ["https://voice.example", "https://admin.example"]
+    assert options.accepts_token == ["session_token"]
+    assert options.secret_key == "sk_test_not-a-real-secret"
+    assert options.jwt_key == "test-public-key"
+
+
+def test_clerk_test_email_aliases_are_disabled_in_production(tmp_path: Path) -> None:
+    development = settings_for_database(tmp_path / "development.db")
+    production = development.model_copy(update={"app_env": "production"})
+    email = "rahul+clerk_test_001@example.com"
+
+    assert application_email_candidates(email, settings=development) == (
+        email,
+        "rahul@example.com",
+    )
+    assert application_email_candidates(email, settings=production) == (email,)
+
+
+def test_clerk_bearer_rejects_unlinked_email(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database_path = tmp_path / "clerk-unlinked-auth.db"
+    settings = settings_for_database(
+        database_path,
+        enable_demo_auth=False,
+        clerk_secret_key="sk_test_not-a-real-secret",
+    )
+    _mock_clerk_identity(monkeypatch, email="unknown+clerk_test@example.com")
+    app = create_app(settings)
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/v1/me",
+            headers={"Authorization": "Bearer clerk-session-token"},
+        )
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Could not validate credentials"}
     assert response.headers["www-authenticate"] == "Bearer"
 
 
@@ -1459,6 +1641,203 @@ def test_order_lookup_is_scoped_to_session_customer_and_tenant(api: ApiHarness) 
     assert other_tenant_order.json() == {"detail": "Order not found"}
 
 
+def test_reservation_tools_complete_an_idempotent_customer_scoped_lifecycle(
+    api: ApiHarness,
+) -> None:
+    token = _login(api.client)
+    _create_session(api.client, token)
+    interaction_id = "interaction-reservation-lifecycle"
+    reservation_date = (datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(days=2)).date()
+
+    availability = api.client.post(
+        "/v1/sarvam/tools/check-availability",
+        headers=_tool_headers(),
+        json={
+            "conversation_ref": TEST_CONVERSATION_REF,
+            "interaction_id": interaction_id,
+            "reservation_date": reservation_date.isoformat(),
+            "preferred_time": "19:00:00",
+            "party_size": 8,
+        },
+    )
+    assert availability.status_code == 200, availability.text
+    assert availability.headers["cache-control"] == "no-store"
+    availability_body = availability.json()
+    assert availability_body["available"] is True
+    assert availability_body["service_location"] == "By the Brew"
+    assert availability_body["timezone"] == "Asia/Kolkata"
+    assert 1 <= len(availability_body["slots"]) <= 5
+    selected_start = availability_body["slots"][0]["start_at"]
+
+    create_payload = {
+        "conversation_ref": TEST_CONVERSATION_REF,
+        "interaction_id": interaction_id,
+        "start_at": selected_start,
+        "party_size": 8,
+        "special_requests": "Window seat if possible",
+    }
+    created = api.client.post(
+        "/v1/sarvam/tools/create-reservation",
+        headers=_tool_headers(),
+        json=create_payload,
+    )
+    replayed_create = api.client.post(
+        "/v1/sarvam/tools/create-reservation",
+        headers=_tool_headers(),
+        json=create_payload,
+    )
+    conflicting_create = api.client.post(
+        "/v1/sarvam/tools/create-reservation",
+        headers=_tool_headers(),
+        json={**create_payload, "guest_name": "Another Guest"},
+    )
+
+    assert created.status_code == 200, created.text
+    assert created.json()["idempotent"] is False
+    created_reservation = created.json()["reservation"]
+    reference = created_reservation["reservation_reference"]
+    assert reference.startswith("RSV-")
+    assert created_reservation["guest_name"] == "Rahul Mehta"
+    assert created_reservation["status"] == "confirmed"
+    assert created_reservation["version"] == 1
+    assert replayed_create.status_code == 200
+    assert replayed_create.json()["idempotent"] is True
+    assert replayed_create.json()["reservation"] == created_reservation
+    assert conflicting_create.status_code == 409
+    assert conflicting_create.json() == {
+        "detail": "The selected reservation time is no longer available"
+    }
+
+    found = api.client.post(
+        "/v1/sarvam/tools/find-reservation",
+        headers=_tool_headers(),
+        json={
+            "conversation_ref": TEST_CONVERSATION_REF,
+            "interaction_id": interaction_id,
+            "reservation_reference": reference.lower(),
+        },
+    )
+    assert found.status_code == 200
+    assert found.json()["found"] is True
+    assert found.json()["reservations"] == [created_reservation]
+
+    later_availability = api.client.post(
+        "/v1/sarvam/tools/check-availability",
+        headers=_tool_headers(),
+        json={
+            "conversation_ref": TEST_CONVERSATION_REF,
+            "interaction_id": interaction_id,
+            "reservation_date": reservation_date.isoformat(),
+            "preferred_time": "20:00:00",
+            "party_size": 8,
+        },
+    )
+    assert later_availability.status_code == 200
+    alternative_start = next(
+        slot["start_at"]
+        for slot in later_availability.json()["slots"]
+        if slot["start_at"] != selected_start
+    )
+    reschedule_payload = {
+        "conversation_ref": TEST_CONVERSATION_REF,
+        "interaction_id": interaction_id,
+        "reservation_reference": reference,
+        "new_start_at": alternative_start,
+        "expected_version": 1,
+    }
+    rescheduled = api.client.post(
+        "/v1/sarvam/tools/reschedule-reservation",
+        headers=_tool_headers(),
+        json=reschedule_payload,
+    )
+    replayed_reschedule = api.client.post(
+        "/v1/sarvam/tools/reschedule-reservation",
+        headers=_tool_headers(),
+        json=reschedule_payload,
+    )
+    assert rescheduled.status_code == 200, rescheduled.text
+    assert rescheduled.json()["reservation"]["version"] == 2
+    assert rescheduled.json()["reservation"]["start_at"] != created_reservation["start_at"]
+    assert replayed_reschedule.status_code == 200
+    assert replayed_reschedule.json()["idempotent"] is True
+
+    cancel_payload = {
+        "conversation_ref": TEST_CONVERSATION_REF,
+        "interaction_id": interaction_id,
+        "reservation_reference": reference,
+        "expected_version": 2,
+    }
+    cancelled = api.client.post(
+        "/v1/sarvam/tools/cancel-reservation",
+        headers=_tool_headers(),
+        json=cancel_payload,
+    )
+    replayed_cancel = api.client.post(
+        "/v1/sarvam/tools/cancel-reservation",
+        headers=_tool_headers(),
+        json=cancel_payload,
+    )
+    current_version_cancel = api.client.post(
+        "/v1/sarvam/tools/cancel-reservation",
+        headers=_tool_headers(),
+        json={**cancel_payload, "expected_version": 3},
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["reservation"]["status"] == "cancelled"
+    assert cancelled.json()["reservation"]["version"] == 3
+    assert replayed_cancel.status_code == 200
+    assert replayed_cancel.json()["idempotent"] is True
+    assert current_version_cancel.status_code == 200
+    assert current_version_cancel.json()["idempotent"] is True
+    assert current_version_cancel.json()["reservation"]["version"] == 3
+
+    with sqlite3.connect(api.database_path) as connection:
+        reservation_count = connection.execute("SELECT COUNT(*) FROM cafe_reservations").fetchone()
+        operation_count = connection.execute(
+            "SELECT COUNT(*) FROM reservation_tool_operations"
+        ).fetchone()
+    assert reservation_count == (1,)
+    assert operation_count == (4,)
+
+
+def test_reservation_tools_reject_bad_auth_and_ambiguous_times(api: ApiHarness) -> None:
+    token = _login(api.client)
+    _create_session(api.client, token)
+    reservation_date = (datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(days=2)).date()
+    payload = {
+        "conversation_ref": TEST_CONVERSATION_REF,
+        "reservation_date": reservation_date.isoformat(),
+        "preferred_time": "19:00:00",
+        "party_size": 2,
+    }
+
+    unauthenticated = api.client.post(
+        "/v1/sarvam/tools/check-availability",
+        json=payload,
+    )
+    oversized_party = api.client.post(
+        "/v1/sarvam/tools/check-availability",
+        headers=_tool_headers(),
+        json={**payload, "party_size": 9},
+    )
+    naive_start = api.client.post(
+        "/v1/sarvam/tools/create-reservation",
+        headers=_tool_headers(),
+        json={
+            "conversation_ref": TEST_CONVERSATION_REF,
+            "start_at": f"{reservation_date.isoformat()}T19:00:00",
+            "party_size": 2,
+        },
+    )
+
+    assert unauthenticated.status_code == 401
+    assert oversized_party.status_code == 200
+    assert oversized_party.json()["available"] is False
+    assert oversized_party.json()["slots"] == []
+    assert "maximum supported party size is 8" in oversized_party.json()["reason"]
+    assert naive_start.status_code == 422
+
+
 def test_sqlite_composite_key_rejects_cross_tenant_order_relationship(
     api: ApiHarness,
 ) -> None:
@@ -1788,37 +2167,11 @@ def test_production_rejects_demo_defaults_even_with_safe_secrets() -> None:
         )
 
 
-@pytest.mark.parametrize(
-    ("provider_configuration", "expected_detail"),
-    [
-        (
-            {},
-            "Voice sessions are unavailable because the provider is not fully configured.",
-        ),
-        (
-            {
-                "sarvam_api_key": "test-api-key",
-                "sarvam_org_id": "test-organisation",
-                "sarvam_workspace_id": "test-workspace",
-                "sarvam_agent_id": "test-agent",
-            },
-            (
-                "Voice sessions are temporarily unavailable pending the authenticated "
-                "provider session contract."
-            ),
-        ),
-    ],
-)
-def test_sarvam_provider_fails_closed_with_503(
-    tmp_path: Path,
-    provider_configuration: dict[str, str],
-    expected_detail: str,
-) -> None:
+def test_sarvam_provider_fails_closed_with_incomplete_configuration(tmp_path: Path) -> None:
     database_path = tmp_path / "sarvam-provider.sqlite3"
     settings = settings_for_database(
         database_path,
         voice_provider="sarvam",
-        **provider_configuration,
     )
 
     with TestClient(create_app(settings)) as client:
@@ -1830,7 +2183,9 @@ def test_sarvam_provider_fails_closed_with_503(
         )
 
         assert response.status_code == 503
-        assert response.json() == {"detail": expected_detail}
+        assert response.json() == {
+            "detail": "Voice sessions are unavailable because the provider is not fully configured."
+        }
         assert _count(database_path, "voice_sessions") == 1
         (stored_status,) = _query_one(
             database_path,
@@ -1839,8 +2194,163 @@ def test_sarvam_provider_fails_closed_with_503(
         assert stored_status == "failed"
 
 
+def test_sarvam_provider_returns_an_encrypted_backend_relay_url(tmp_path: Path) -> None:
+    database_path = tmp_path / "sarvam-relay-session.sqlite3"
+    settings = settings_for_database(
+        database_path,
+        voice_provider="sarvam",
+        sarvam_api_key="test-api-key",
+        sarvam_org_id="test-organisation",
+        sarvam_workspace_id="test-workspace",
+        sarvam_agent_id="test-agent",
+        sarvam_agent_version=2,
+        voice_websocket_public_url="ws://127.0.0.1:8000/v1/voice/stream",
+    )
+    app = create_app(settings)
+
+    with TestClient(app) as client:
+        token = _login(client)
+        response = client.post(
+            "/v1/voice/sessions",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"language": "Hindi"},
+        )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["provider"] == "sarvam"
+    assert payload["connection"]["transport"] == "websocket"
+    websocket_url = payload["connection"]["websocket_url"]
+    assert websocket_url.startswith("ws://127.0.0.1:8000/v1/voice/stream?token=")
+    assert TEST_CONVERSATION_REF not in websocket_url
+
+    relay_token = parse_qs(urlsplit(websocket_url).query)["token"][0]
+    claims = app.state.voice_provider.decode_relay_token(relay_token)
+    assert claims.session_id == payload["session_id"]
+    assert claims.conversation_ref == TEST_CONVERSATION_REF
+    assert claims.language == "Hindi"
+    assert claims.agent_variables == {
+        "conversation_ref": TEST_CONVERSATION_REF,
+        "preferred_language": "Hindi",
+    }
+
+
+def test_sarvam_browser_relay_streams_audio_and_saves_the_outcome(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database_path = tmp_path / "sarvam-browser-relay.sqlite3"
+    settings = settings_for_database(
+        database_path,
+        voice_provider="sarvam",
+        sarvam_api_key="test-api-key",
+        sarvam_org_id="test-organisation",
+        sarvam_workspace_id="test-workspace",
+        sarvam_agent_id="test-agent",
+        sarvam_agent_version=2,
+        voice_websocket_public_url="ws://127.0.0.1:8000/v1/voice/stream",
+    )
+    app = create_app(settings)
+    provider = app.state.voice_provider
+    captured_audio: list[bytes] = []
+    captured_variables: dict[str, str] = {}
+
+    class FakeAgent:
+        def __init__(self) -> None:
+            self.disconnected = asyncio.Event()
+
+        async def send_audio(self, audio: bytes) -> None:
+            captured_audio.append(audio)
+
+        async def wait_for_disconnect(self) -> None:
+            await self.disconnected.wait()
+
+        async def stop(self) -> None:
+            self.disconnected.set()
+
+    async def activate_agent(
+        claims: object,
+        *,
+        agent_variables: Mapping[str, str],
+        initial_bot_message: str | None,
+        audio_callback: Any,
+        transcript_callback: Any,
+        event_callback: Any,
+    ) -> FakeAgent:
+        del claims
+        captured_variables.update(agent_variables)
+        assert initial_bot_message == "Hello Rahul, how can I help you today?"
+        await event_callback(
+            ServerInteractionConnectedEvent(
+                timestamp=1.0,
+                reference_id="reference-test",
+                interaction_id="interaction-test",
+            )
+        )
+        await transcript_callback(
+            ServerTranscriptMsg(
+                timestamp=2.0,
+                role=Role.BOT,
+                content="Your account is ready.",
+            )
+        )
+        await audio_callback(
+            ServerAudioChunkMsg(
+                timestamp=3.0,
+                audio_base64="AQI=",
+                format=AudioEncoding.LINEAR16,
+                sample_rate=16_000,
+                status=MsgStatus.COMPLETED,
+            )
+        )
+        return FakeAgent()
+
+    monkeypatch.setattr(provider, "activate_agent", activate_agent)
+
+    with TestClient(app) as client:
+        bearer = _login(client)
+        session = _create_session(client, bearer, language="English")
+        websocket_url = urlsplit(session["connection"]["websocket_url"])
+        relay_token = parse_qs(websocket_url.query)["token"][0].rstrip("=")
+
+        with client.websocket_connect(
+            websocket_url.path,
+            headers={"origin": "http://testserver"},
+            subprotocols=["svara-relay", f"svara-token.{relay_token}"],
+        ) as socket:
+            assert socket.accepted_subprotocol == "svara-relay"
+            assert socket.receive_json() == {"type": "connected"}
+            assert socket.receive_json() == {"type": "state", "state": "listening"}
+            transcript = socket.receive_json()
+            assert transcript["type"] == "transcript"
+            assert transcript["speaker"] == "agent"
+            assert transcript["text"] == "Your account is ready."
+            assert socket.receive_json() == {"type": "state", "state": "speaking"}
+            assert socket.receive_bytes() == b"\x01\x02"
+            assert socket.receive_json() == {"type": "state", "state": "listening"}
+            socket.send_bytes(b"\x03\x04")
+            socket.send_json({"type": "end"})
+            with pytest.raises(WebSocketDisconnect):
+                socket.receive_json()
+
+        archive = client.get(
+            "/v1/conversations",
+            headers={"Authorization": f"Bearer {bearer}"},
+        )
+
+    assert captured_audio == [b"\x03\x04"]
+    assert captured_variables["conversation_ref"] == TEST_CONVERSATION_REF
+    assert captured_variables["user_name"] == "Rahul"
+    assert captured_variables["service_provider_name"] == "By the Brew"
+    assert captured_variables["service_location"] == "By the Brew"
+    assert captured_variables["business_hours"] == "Daily 9:00 AM–10:00 PM (Asia/Kolkata)"
+    assert archive.status_code == 200
+    assert archive.json()["total"] == 1
+    assert archive.json()["items"][0]["provider"] == "sarvam"
+
+
 @pytest.mark.asyncio
-async def test_sarvam_termination_remains_fail_closed_without_inventing_a_contract(
+async def test_sarvam_termination_is_idempotent_before_the_relay_connects(
     tmp_path: Path,
 ) -> None:
     settings = settings_for_database(
@@ -1850,18 +2360,18 @@ async def test_sarvam_termination_remains_fail_closed_without_inventing_a_contra
         sarvam_org_id="test-organisation",
         sarvam_workspace_id="test-workspace",
         sarvam_agent_id="test-agent",
+        sarvam_agent_version=2,
     )
     provider = SarvamVoiceProvider(settings)
 
-    with pytest.raises(VoiceProviderTerminationError) as captured:
-        await provider.terminate_session(
-            provider_session_id="provider-session",
-            idempotency_key="local-session",
-        )
-
-    assert captured.value.ambiguous is False
-    assert captured.value.retry_after_seconds is None
-    assert "termination contract is unavailable" in str(captured.value)
+    await provider.terminate_session(
+        provider_session_id="provider-session",
+        idempotency_key="local-session",
+    )
+    await provider.terminate_session(
+        provider_session_id="provider-session",
+        idempotency_key="local-session",
+    )
 
 
 def test_authenticated_profile_is_minimal_and_customer_scoped(api: ApiHarness) -> None:
@@ -2962,7 +3472,7 @@ def test_initial_alembic_migration_creates_the_complete_fresh_schema(tmp_path: P
             for row in connection.execute("PRAGMA table_info(admin_audit_events)").fetchall()
         }
     assert table_names == {*Base.metadata.tables, "alembic_version"}
-    assert revision == ("20260903_0001",)
+    assert revision == ("20260909_0003",)
     assert {foreign_key[2] for foreign_key in audit_foreign_keys} == {
         "customers",
         "tenants",

@@ -160,6 +160,52 @@
   width: min(100%, 470px);
 }
 
+.clerkRoot,
+.clerkCardBox {
+  width: 100%;
+}
+
+.clerkCardBox {
+  box-shadow: none;
+}
+
+.clerkCard {
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.clerkHeader,
+.clerkFooter {
+  display: none;
+}
+
+.clerkSocialButton {
+  min-height: 50px;
+  background: rgba(255, 255, 255, 0.72);
+  border-color: var(--line-strong);
+  box-shadow: none;
+}
+
+.clerkPrimaryButton {
+  min-height: 52px;
+  background: var(--ink);
+  box-shadow: none;
+  font-weight: 630;
+}
+
+.clerkPrimaryButton:hover,
+.clerkPrimaryButton:focus {
+  background: #302f2a;
+}
+
+.clerkLink {
+  color: var(--ember-dark);
+  font-weight: 620;
+}
+
 .formHeading {
   margin-bottom: 42px;
 }
@@ -324,43 +370,87 @@
   font-weight: 620;
 }
 
-.field input {
+.inputShell {
+  display: flex;
   width: 100%;
   height: 54px;
-  padding: 0 16px;
+  align-items: center;
+  gap: 11px;
+  padding: 0 14px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid var(--line-strong);
   border-radius: 12px;
-  outline: none;
-  font-size: var(--text-base);
   transition: background-color 170ms ease, border-color 170ms ease, box-shadow 170ms ease;
 }
 
-.field input::placeholder {
+.inputShell > svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.field .inputShell input {
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--ink);
+  font-size: var(--text-base);
+}
+
+.field .inputShell input::placeholder {
   color: #716e66;
 }
 
-.field input:hover {
+.inputShell:hover {
   border-color: rgba(23, 23, 20, 0.32);
 }
 
-.field input:focus {
+.inputShell:focus-within {
   background: var(--paper-strong);
   border-color: var(--ink);
   box-shadow: 0 0 0 3px rgba(23, 23, 20, 0.06);
 }
 
-.field input:focus-visible {
+.inputShell:has(input:focus-visible) {
   outline: 2px solid var(--ember);
   outline-offset: 2px;
 }
 
-.field input[readonly] {
-  color: var(--ink);
-  cursor: default;
+.inputAction {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  margin-right: -7px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
 }
 
-.demoNote {
+.inputAction:hover {
+  background: var(--canvas-deep);
+  color: var(--ink);
+}
+
+.inputAction:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 1px;
+}
+
+.inputAction:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.demoNote,
+.authNote {
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -373,19 +463,22 @@
   line-height: 1.55;
 }
 
-.demoNote svg {
+.demoNote svg,
+.authNote svg {
   flex: 0 0 auto;
   margin-top: 2px;
   color: var(--ember-dark);
 }
 
-.demoNote p {
+.demoNote p,
+.authNote p {
   display: grid;
   gap: 1px;
   margin: 0;
 }
 
-.demoNote strong {
+.demoNote strong,
+.authNote strong {
   color: var(--ink-soft);
   font-weight: 640;
 }
@@ -448,12 +541,28 @@
   text-underline-offset: 2px;
 }
 
+.authSwitch {
+  margin: 12px auto 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.authSwitch a {
+  color: var(--ink);
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+}
+
 .support {
   position: absolute;
   right: 0;
   bottom: 36px;
   left: 0;
   margin: 0;
+  padding: 0 56px;
   color: var(--muted);
   font-size: var(--text-sm);
   text-align: center;
@@ -556,7 +665,7 @@
     font-size: 3.2rem;
   }
 
-  .field input,
+  .inputShell,
   .submit {
     min-height: 52px;
   }

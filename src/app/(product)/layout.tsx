@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
@@ -7,8 +8,11 @@ import { getCurrentProfile } from "@/lib/server-api";
 export const dynamic = "force-dynamic";
 
 export default async function ProductLayout({ children }: { children: React.ReactNode }) {
+  const { userId } = await auth();
+  if (!userId) redirect("/sign-in");
+
   const profile = await getCurrentProfile();
-  if (!profile) redirect("/sign-in");
+  if (!profile) redirect("/access-pending");
 
   return (
     <EditorDraftProvider key={profile.user_id}>
