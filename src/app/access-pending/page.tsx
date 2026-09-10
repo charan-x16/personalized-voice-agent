@@ -13,11 +13,12 @@ export default async function AccessPendingPage() {
 
   return (
     <main className={styles.page}>
+      <a className={styles.skipLink} href="#access-content">Skip to access status</a>
       <header className={styles.header}>
         <Brand />
         <UserButton />
       </header>
-      <section className={styles.card} aria-labelledby="access-title">
+      <section className={styles.card} id="access-content" tabIndex={-1} aria-labelledby="access-title">
         <span className={styles.icon} aria-hidden="true"><ShieldAlert size={23} /></span>
         <p className={styles.eyebrow}>Signed in securely</p>
         <h1 id="access-title">Your workspace is not linked yet.</h1>

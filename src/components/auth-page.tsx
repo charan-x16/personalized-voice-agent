@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 
 import { Brand } from "@/components/brand";
+import { PUBLIC_SUPPORT_DESTINATION } from "@/lib/public-site";
 import styles from "@/app/sign-in/sign-in.module.css";
 
 const clerkAppearance = {
@@ -49,6 +50,9 @@ export function AuthPage({ mode }: { mode: "sign-in" | "sign-up" }) {
 
   return (
     <main className={styles.page}>
+      <a className={styles.skipLink} href="#auth-content">
+        Skip to authentication
+      </a>
       <section className={styles.storyPanel} aria-label="About Svara">
         <div className={styles.storyHeader}>
           <Brand inverse />
@@ -75,12 +79,17 @@ export function AuthPage({ mode }: { mode: "sign-in" | "sign-up" }) {
         </div>
       </section>
 
-      <section className={styles.formPanel} aria-labelledby="auth-title">
+      <section className={styles.formPanel} id="auth-content" tabIndex={-1} aria-labelledby="auth-title">
         <div className={styles.mobileBrand}>
           <Brand />
           <Link href="/" aria-label="Back to home">
-            <ArrowLeft size={18} />
+            <ArrowLeft size={18} aria-hidden="true" />
           </Link>
+        </div>
+
+        <div className={styles.mobileStatement}>
+          <span aria-hidden="true" />
+          <p>Personal voice, grounded in the context your customers trust.</p>
         </div>
 
         <div className={styles.formWrap}>
@@ -124,7 +133,14 @@ export function AuthPage({ mode }: { mode: "sign-in" | "sign-up" }) {
         </div>
 
         <p className={styles.support}>
-          Need workspace access? <a href="mailto:hello@svara.example">Contact your administrator</a>
+          {PUBLIC_SUPPORT_DESTINATION ? (
+            <>
+              Need workspace access?{" "}
+              <a href={PUBLIC_SUPPORT_DESTINATION}>Contact your administrator</a>
+            </>
+          ) : (
+            "Workspace access is managed by your administrator."
+          )}
         </p>
       </section>
     </main>

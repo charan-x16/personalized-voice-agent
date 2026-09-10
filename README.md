@@ -8,7 +8,7 @@ The web app and backend support both an isolated local mock flow and live browse
 
 ### Web application
 
-- Editorial product landing page
+- Editorial product landing page with public, no-microphone conversation and language simulations
 - Clerk sign-in/sign-up with managed sessions and polished account controls
 - Role-aware customer and tenant-administrator workspaces
 - Searchable, filterable customer directory with revision-safe profile and voice-agent editors
@@ -111,6 +111,10 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your-clerk-publishable-key
 CLERK_SECRET_KEY=your-clerk-secret-key
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+# Optional: canonical URL for production metadata
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+# Optional: an HTTPS support page or mailto address for access help
+NEXT_PUBLIC_SUPPORT_URL=
 ```
 
 Then run:

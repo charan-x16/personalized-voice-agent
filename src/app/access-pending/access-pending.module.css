@@ -6,6 +6,28 @@
     var(--canvas);
 }
 
+.skipLink {
+  position: fixed;
+  z-index: 10;
+  top: 12px;
+  left: 12px;
+  padding: 10px 14px;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px);
+}
+
+.skipLink:focus {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 .header {
   display: flex;
   width: min(100%, 1180px);

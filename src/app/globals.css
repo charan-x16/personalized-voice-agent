@@ -21,6 +21,11 @@
   --radius-lg: 28px;
   --radius-pill: 999px;
   --content: 1180px;
+  --content-max: 1320px;
+  --reading-max: 680px;
+  --section-space-sm: clamp(72px, 8vw, 108px);
+  --section-space-md: clamp(92px, 10vw, 142px);
+  --section-space-lg: clamp(112px, 12vw, 168px);
   --font-sans: "Instrument Sans Variable", "Nirmala UI", "Kohinoor Devanagari", "Kohinoor Tamil", "Segoe UI", sans-serif;
   --font-serif: "Newsreader Variable", Georgia, serif;
   --text-xs: 0.75rem;

@@ -13,6 +13,7 @@ import {
 import { connectionExpiryDelayMilliseconds } from "@/lib/voice/connection-expiry";
 import type { VoiceStopReason, VoiceTransport, VoiceTransportEvent } from "@/lib/voice/contracts";
 import { VoiceTransportError } from "@/lib/voice/contracts";
+import { acquireMicrophoneForTransport } from "@/lib/voice/microphone";
 import {
   initialVoiceSessionState,
   voiceSessionReducer,
@@ -333,24 +334,6 @@ export function useVoiceSession({
     lifecycleControllerRef.current = controller;
 
     try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("Microphone access is not supported in this browser.");
-      }
-
-      const microphone = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-      if (!mountedRef.current || run !== generationRef.current) {
-        microphone.getTracks().forEach((track) => track.stop());
-        return;
-      }
-
-      microphoneRef.current = microphone;
-      dispatch({ type: "microphone-ready" });
       const session = await requestVoiceSession(preferredLanguage, controller.signal);
       if (!mountedRef.current || run !== generationRef.current) {
         void cancelVoiceSession(session.session_id, true);
@@ -376,6 +359,16 @@ export function useVoiceSession({
           "The secure voice connection expired. Start a new conversation to continue.",
         );
       }, connectionExpiryDelayMilliseconds(session.connection.expires_at));
+
+      const microphone = await acquireMicrophoneForTransport(session.connection.transport);
+      if (!mountedRef.current || run !== generationRef.current) {
+        microphone?.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      if (microphone) {
+        microphoneRef.current = microphone;
+      }
+      dispatch({ type: "microphone-ready" });
 
       const transport = createVoiceTransport({
         session,

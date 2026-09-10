@@ -6,24 +6,12 @@ import { useEffect, useRef, useState, useTransition, type FormEvent } from "reac
 
 import type { CustomerDetail, CustomerUpdateRequest } from "@/lib/api-types";
 import { parseCustomerDetail } from "@/lib/api-validation";
+import { SELECTABLE_LANGUAGES } from "@/lib/languages";
 import { useEditorDraftState, useUnsavedEditor } from "@/components/editor-drafts";
 import styles from "./customer-editor.module.css";
 
 const PROFILE_CONFLICT_DETAIL =
   "Customer profile was updated by another administrator. Refresh and try again.";
-
-const languageOptions = [
-  "English",
-  "Hindi",
-  "Bengali",
-  "Gujarati",
-  "Kannada",
-  "Malayalam",
-  "Marathi",
-  "Punjabi",
-  "Tamil",
-  "Telugu",
-];
 
 type Feedback =
   | { tone: "success"; message: string }
@@ -208,9 +196,14 @@ export function CustomerEditor({ customer }: { customer: CustomerDetail }) {
     }
   }
 
-  const languageChoices = languageOptions.includes(language)
-    ? languageOptions
-    : [language, ...languageOptions];
+  const languageChoices = SELECTABLE_LANGUAGES.some(
+    (option) => option.displayName === language,
+  )
+    ? SELECTABLE_LANGUAGES
+    : [
+        { code: "saved", displayName: language, nativeName: language, selectable: true },
+        ...SELECTABLE_LANGUAGES,
+      ];
 
   return (
     <section className={styles.panel} aria-labelledby="customer-settings-title">
@@ -273,7 +266,10 @@ export function CustomerEditor({ customer }: { customer: CustomerDetail }) {
               }}
             >
               {languageChoices.map((option) => (
-                <option value={option} key={option}>{option}</option>
+                <option value={option.displayName} key={option.code}>
+                  {option.displayName}
+                  {option.nativeName !== option.displayName ? ` · ${option.nativeName}` : ""}
+                </option>
               ))}
             </select>
             {fieldErrors.language && (

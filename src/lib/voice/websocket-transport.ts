@@ -226,6 +226,12 @@ export class WebSocketVoiceTransport implements VoiceTransport {
         "Invalid WebSocket transport configuration.",
       );
     }
+    if (!options.microphone) {
+      throw new VoiceTransportError(
+        "microphone_required",
+        "A microphone is required for a live voice session.",
+      );
+    }
     if (this.started) {
       throw new VoiceTransportError("already_started", "The voice transport is already active.");
     }

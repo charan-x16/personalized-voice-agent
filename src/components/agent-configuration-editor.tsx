@@ -247,7 +247,7 @@ export function AgentConfigurationEditor({
     <section className={styles.panel} aria-labelledby="agent-configuration-title">
       <div className={styles.heading}>
         <div className={styles.headingIcon} aria-hidden="true">
-          <Bot size={20} strokeWidth={1.65} />
+          <Bot size={20} strokeWidth={1.65} aria-hidden="true" />
         </div>
         <div>
           <p className="eyebrow">Conversation design</p>
@@ -315,7 +315,7 @@ export function AgentConfigurationEditor({
                     <small>{option.description}</small>
                   </span>
                   <span className={styles.radioMark} aria-hidden="true">
-                    {tone === option.value && <Check size={11} strokeWidth={2.5} />}
+                    {tone === option.value && <Check size={11} strokeWidth={2.5} aria-hidden="true" />}
                   </span>
                 </label>
               ))}

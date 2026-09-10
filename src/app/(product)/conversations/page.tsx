@@ -58,7 +58,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
 
   return (
     <div className={styles.workspace}>
-      <header className={`${styles.pageHeader} ${styles.listPageHeader} reveal`}>
+      <header className={`${styles.pageHeader} ${styles.listPageHeader}`}>
         <div>
           <p className="eyebrow">Conversation archive</p>
           <h1 className={`${styles.pageTitle} display-type`}>Conversations</h1>
@@ -67,11 +67,11 @@ export default async function ConversationsPage({ searchParams }: { searchParams
           </p>
         </div>
         <Link href="/voice" className="button button-primary">
-          <AudioLines size={17} /> Start conversation
+          <AudioLines size={17} aria-hidden="true" /> Start conversation
         </Link>
       </header>
 
-      <section className={`${styles.archivePanel} reveal reveal-delay-1`} aria-label="Conversation archive">
+      <section className={styles.archivePanel} aria-label="Conversation archive">
         <div className={styles.archiveToolbar}>
           <form className={styles.searchForm} action="/conversations" method="get" role="search">
             <Search size={17} strokeWidth={1.8} aria-hidden="true" />
@@ -89,7 +89,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
             <button type="submit">Search</button>
           </form>
 
-          <div className={styles.filterGroup} aria-label="Filter conversations by outcome">
+          <div className={styles.filterGroup} role="group" aria-label="Filter conversations by outcome">
             {filters.map((filter) => (
               <Link
                 key={filter.value}
@@ -144,7 +144,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
 
                   <span className={`${styles.outcome} ${outcomeClass(outcome)}`}>{outcome}</span>
                   <span className={styles.openRow} aria-hidden="true">
-                    <ArrowRight size={17} strokeWidth={1.7} />
+                    <ArrowRight size={17} strokeWidth={1.7} aria-hidden="true" />
                   </span>
                 </Link>
               );

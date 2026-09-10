@@ -27,7 +27,7 @@ export default function ProductError({
       </p>
       <div className={styles.errorActions}>
         <button className="button button-primary" type="button" onClick={reset}>
-          <RefreshCcw size={16} /> Try again
+          <RefreshCcw size={16} aria-hidden="true" /> Try again
         </button>
         <Link className="button button-quiet" href="/sign-in">Return to sign in</Link>
       </div>

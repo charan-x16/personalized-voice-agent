@@ -23,6 +23,10 @@ import {
   MAX_CONNECTION_EXPIRY_DELAY_MS,
 } from "../../src/lib/voice/connection-expiry.ts";
 import { WebSocketVoiceTransport } from "../../src/lib/voice/websocket-transport.ts";
+import {
+  acquireMicrophoneForTransport,
+  voiceTransportRequiresMicrophone,
+} from "../../src/lib/voice/microphone.ts";
 
 const now = Date.parse("2026-03-03T10:00:00.000Z");
 
@@ -50,13 +54,13 @@ test("voice reducer follows the mock lifecycle and updates partial transcript tu
   let state = voiceSessionReducer(initialVoiceSessionState, { type: "start" });
   assert.equal(state.phase, "requesting");
 
-  state = voiceSessionReducer(state, { type: "microphone-ready" });
   state = voiceSessionReducer(state, {
     type: "session-created",
     sessionId: "session-1",
     connectionExpiresAt: futureIso(15),
     transport: "mock",
   });
+  state = voiceSessionReducer(state, { type: "microphone-ready" });
   state = voiceSessionReducer(state, {
     type: "transport-event",
     event: { type: "connected" },
@@ -140,6 +144,44 @@ test("live transport is a real websocket adapter and rejects a mismatched contra
       onEvent: () => {},
     }),
     /Invalid WebSocket transport configuration/,
+  );
+});
+
+test("mock transport skips capture while live transport preserves audio constraints", async () => {
+  assert.equal(voiceTransportRequiresMicrophone("mock"), false);
+  assert.equal(voiceTransportRequiresMicrophone("websocket"), true);
+
+  const requests = [];
+  const stream = { getTracks: () => [] };
+  const mediaDevices = {
+    async getUserMedia(constraints) {
+      requests.push(constraints);
+      return stream;
+    },
+  };
+
+  assert.equal(await acquireMicrophoneForTransport("mock", mediaDevices), null);
+  assert.equal(requests.length, 0);
+  assert.equal(await acquireMicrophoneForTransport("websocket", mediaDevices), stream);
+  assert.deepEqual(requests, [{
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+  }]);
+});
+
+test("live websocket transport fails clearly when microphone capture is absent", async () => {
+  const transport = new WebSocketVoiceTransport();
+  await assert.rejects(
+    transport.start({
+      connection: websocketSession().connection,
+      microphone: null,
+      signal: new AbortController().signal,
+      onEvent: () => {},
+    }),
+    /microphone is required/i,
   );
 });
 

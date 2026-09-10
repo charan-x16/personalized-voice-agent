@@ -5,6 +5,29 @@
   background: var(--paper);
 }
 
+.skipLink {
+  position: fixed;
+  z-index: 20;
+  top: 14px;
+  left: 14px;
+  padding: 10px 14px;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px);
+}
+
+.skipLink:focus {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 .storyPanel {
   position: relative;
   display: grid;
@@ -153,6 +176,10 @@
 }
 
 .mobileBrand {
+  display: none;
+}
+
+.mobileStatement {
   display: none;
 }
 
@@ -637,6 +664,43 @@
     justify-content: space-between;
   }
 
+  .mobileStatement {
+    display: grid;
+    width: min(100%, 470px);
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    gap: 13px;
+    margin: 0 auto 28px;
+    color: var(--ink-soft);
+  }
+
+  .mobileStatement > span {
+    position: relative;
+    display: block;
+    height: 1px;
+    background: var(--ember);
+  }
+
+  .mobileStatement > span::after {
+    position: absolute;
+    top: -3px;
+    right: 0;
+    width: 7px;
+    height: 7px;
+    background: var(--paper);
+    border: 2px solid var(--ember);
+    border-radius: 50%;
+    content: "";
+  }
+
+  .mobileStatement p {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 1.12rem;
+    font-style: italic;
+    line-height: 1.25;
+  }
+
   .mobileBrand > a:last-child {
     display: grid;
     width: 40px;
@@ -658,7 +722,7 @@
   }
 
   .formHeading {
-    margin-bottom: 35px;
+    margin-bottom: 30px;
   }
 
   .formHeading h1 {

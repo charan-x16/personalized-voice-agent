@@ -603,6 +603,21 @@
   margin-top: 28px;
 }
 
+.detailSectionNav {
+  display: none;
+}
+
+.profileEditorSlot,
+.agentConfigurationSection,
+.auditSection,
+.activitySection {
+  scroll-margin-top: 76px;
+}
+
+.profileEditorSlot > * {
+  height: 100%;
+}
+
 .profileAside {
   display: grid;
   gap: 14px;
@@ -1362,6 +1377,41 @@
   .loadingDetailGrid {
     grid-template-columns: 1fr;
   }
+
+  .detailSectionNav {
+    position: sticky;
+    z-index: 4;
+    top: 0;
+    display: flex;
+    gap: 4px;
+    padding: 8px 0;
+    margin: 14px 0 -8px;
+    overflow-x: auto;
+    background: color-mix(in srgb, var(--canvas) 94%, transparent);
+    border-bottom: 1px solid var(--line);
+    scrollbar-width: none;
+  }
+
+  .detailSectionNav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .detailSectionNav a {
+    display: inline-flex;
+    min-width: max-content;
+    min-height: 44px;
+    align-items: center;
+    padding: 0 13px;
+    color: var(--ink-soft);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-sm);
+    font-weight: 640;
+  }
+
+  .detailSectionNav a:hover {
+    background: var(--paper);
+    color: var(--ember-dark);
+  }
 }
 
 @media (max-width: 650px) {
@@ -1524,10 +1574,6 @@
     font-size: var(--text-title);
   }
 
-  .searchForm button {
-    display: none;
-  }
-
   .filter {
     min-width: 60px;
   }
@@ -1565,8 +1611,14 @@
   }
 }
 
-/* Workspace typography is functional; editorial serif stays on marketing accents. */
-.pageTitle,
+/* Editorial headings connect the product workspace to Svara's public identity. */
+.pageTitle {
+  font-family: var(--font-serif);
+  font-weight: 480;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
 .detailTitle {
   font-family: var(--font-sans);
   font-weight: 600;

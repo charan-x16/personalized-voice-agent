@@ -117,7 +117,7 @@ export function voiceSessionReducer(
     case "microphone-ready":
       return state.phase === "requesting" ? { ...state, phase: "connecting" } : state;
     case "session-created":
-      return state.phase === "connecting"
+      return state.phase === "requesting" || state.phase === "connecting"
         ? {
             ...state,
             sessionId: action.sessionId,

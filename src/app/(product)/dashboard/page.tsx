@@ -47,9 +47,9 @@ function buildMetrics(conversations: ConversationSummary[], planName: string, to
 
   return [
     { label: "Conversations", value: String(total), note: "All saved outcomes" },
-    { label: "Resolved", value: resolvedRate, note: conversations.length ? `${resolvedCount} of latest ${conversations.length}` : "No outcomes yet" },
+    { label: "Recent resolution", value: resolvedRate, note: conversations.length ? `${resolvedCount} of latest ${conversations.length}` : "No outcomes yet" },
     {
-      label: "Avg. duration",
+      label: "Recent avg. duration",
       value: durations.length ? formatAverageDuration(averageSeconds) : "—",
       note: conversations.length ? `Latest ${conversations.length} saved calls` : "No completed calls yet",
     },
@@ -69,7 +69,7 @@ export default async function DashboardPage() {
 
   return (
     <div className={styles.workspace}>
-      <header className={`${styles.pageHeader} reveal`}>
+      <header className={styles.pageHeader}>
         <div>
           <p className="eyebrow">Workspace overview</p>
           <h1 className={`${styles.pageTitle} display-type`}>
@@ -82,7 +82,7 @@ export default async function DashboardPage() {
         <p className={styles.dateline}><LocalTime value={now.toISOString()} kind="day" /></p>
       </header>
 
-      <section className={`${styles.heroGrid} reveal reveal-delay-1`} aria-label="Voice agent overview">
+      <section className={styles.heroGrid} aria-label="Voice agent overview">
         <article className={styles.voiceCard}>
           <div className={styles.voiceCardCopy}>
             <div className={styles.readyLabel}>
@@ -98,10 +98,10 @@ export default async function DashboardPage() {
             </div>
             <Link href="/voice" className={styles.startButton}>
               <span className={styles.startButtonIcon} aria-hidden="true">
-                <AudioLines size={18} strokeWidth={2} />
+                <AudioLines size={18} strokeWidth={2} aria-hidden="true" />
               </span>
               Start a conversation
-              <ArrowRight size={17} strokeWidth={1.8} />
+              <ArrowRight size={17} strokeWidth={1.8} aria-hidden="true" />
             </Link>
           </div>
 
@@ -124,7 +124,7 @@ export default async function DashboardPage() {
 
           <div className={styles.agentIdentity}>
             <div className={styles.agentMark} aria-hidden="true">
-              <Sparkles size={22} strokeWidth={1.65} />
+              <Sparkles size={22} strokeWidth={1.65} aria-hidden="true" />
             </div>
             <div>
               <h2>{profile.agent_name ?? "Your assistant"}</h2>
@@ -134,26 +134,26 @@ export default async function DashboardPage() {
 
           <dl className={styles.agentDetails}>
             <div>
-              <dt><Languages size={15} /> Language</dt>
+              <dt><Languages size={15} aria-hidden="true" /> Language</dt>
               <dd>{profile.preferred_language ?? "Not set"}</dd>
             </div>
             <div>
-              <dt><MessageCircleMore size={15} /> Mode</dt>
+              <dt><MessageCircleMore size={15} aria-hidden="true" /> Mode</dt>
               <dd>{profile.voice_mode === "mock" ? "Text-only demo" : "Voice session"}</dd>
             </div>
             <div>
-              <dt><Clock3 size={15} /> Last saved</dt>
+              <dt><Clock3 size={15} aria-hidden="true" /> Last saved</dt>
               <dd>{conversations[0] ? <LocalTime value={conversations[0].started_at} /> : "No calls yet"}</dd>
             </div>
           </dl>
 
           <div className={styles.agentFoot}>
-            <span><Check size={14} strokeWidth={2.2} /> Customer context connected</span>
+            <span><Check size={14} strokeWidth={2.2} aria-hidden="true" /> Customer context connected</span>
           </div>
         </aside>
       </section>
 
-      <section className={`${styles.metricsPanel} reveal reveal-delay-2`} aria-labelledby="performance-title">
+      <section className={styles.metricsPanel} aria-labelledby="performance-title">
         <div className={styles.metricsHeading}>
           <p className="eyebrow" id="performance-title">Recorded activity</p>
           <span>Authenticated customer scope</span>
@@ -169,14 +169,14 @@ export default async function DashboardPage() {
         </dl>
       </section>
 
-      <section className={`${styles.recentSection} reveal reveal-delay-3`} aria-labelledby="recent-title">
+      <section className={styles.recentSection} aria-labelledby="recent-title">
         <div className={styles.sectionHeading}>
           <div>
             <p className="eyebrow">Activity</p>
             <h2 id="recent-title">Recent conversations</h2>
           </div>
           <Link href="/conversations" className={styles.textLink}>
-            View all <ArrowRight size={15} />
+            View all <ArrowRight size={15} aria-hidden="true" />
           </Link>
         </div>
 

@@ -99,11 +99,11 @@ export default async function CustomerDetailPage({
 
   return (
     <div className={styles.workspace}>
-      <Link href="/customers" className={`${styles.backLink} reveal`}>
+      <Link href="/customers" className={styles.backLink}>
         <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> All customers
       </Link>
 
-      <header className={`${styles.detailHeader} reveal`}>
+      <header className={styles.detailHeader}>
         <div className={styles.detailIdentity}>
           <span className={styles.detailAvatar} aria-hidden="true">{customer.initials}</span>
           <div>
@@ -118,7 +118,7 @@ export default async function CustomerDetailPage({
         </span>
       </header>
 
-      <dl className={`${styles.detailMeta} reveal reveal-delay-1`}>
+      <dl className={styles.detailMeta}>
         <div>
           <dt><Languages size={15} strokeWidth={1.8} aria-hidden="true" /> Preferred language</dt>
           <dd>{customer.preferred_language}</dd>
@@ -137,11 +137,20 @@ export default async function CustomerDetailPage({
         </div>
       </dl>
 
-      <div className={`${styles.detailGrid} reveal reveal-delay-2`}>
-        <CustomerEditor
-          key={`${customer.id}:${customer.profile_revision}`}
-          customer={customer}
-        />
+      <nav className={styles.detailSectionNav} aria-label="Customer profile sections">
+        <a href="#profile-settings">Profile</a>
+        <a href="#agent-settings">Agent</a>
+        <a href="#admin-changes">Changes</a>
+        <a href="#customer-activity">Activity</a>
+      </nav>
+
+      <div className={styles.detailGrid}>
+        <div className={styles.profileEditorSlot} id="profile-settings">
+          <CustomerEditor
+            key={`${customer.id}:${customer.profile_revision}`}
+            customer={customer}
+          />
+        </div>
 
         <aside className={styles.profileAside}>
           <section className={styles.contextCard} aria-labelledby="stored-context-title">
@@ -189,7 +198,7 @@ export default async function CustomerDetailPage({
         </aside>
       </div>
 
-      <div className={`${styles.agentConfigurationSection} reveal reveal-delay-2`}>
+      <div className={styles.agentConfigurationSection} id="agent-settings">
         <AgentConfigurationEditor
           key={`${customer.id}:${customer.agent_configuration.revision}`}
           customerId={customer.id}
@@ -198,7 +207,7 @@ export default async function CustomerDetailPage({
         />
       </div>
 
-      <section className={`${styles.auditSection} reveal reveal-delay-3`} aria-labelledby="customer-audit-title">
+      <section className={styles.auditSection} id="admin-changes" aria-labelledby="customer-audit-title">
         <div className={styles.auditHeading}>
           <div>
             <p className="eyebrow">Accountability</p>
@@ -219,9 +228,9 @@ export default async function CustomerDetailPage({
                   <li className={styles.auditEvent} key={event.id}>
                     <span className={styles.auditIcon} aria-hidden="true">
                       {isAgentEvent ? (
-                        <Bot size={16} strokeWidth={1.7} />
+                        <Bot size={16} strokeWidth={1.7} aria-hidden="true" />
                       ) : (
-                        <UserRound size={16} strokeWidth={1.7} />
+                        <UserRound size={16} strokeWidth={1.7} aria-hidden="true" />
                       )}
                     </span>
                     <div className={styles.auditBody}>
@@ -246,13 +255,13 @@ export default async function CustomerDetailPage({
         </div>
       </section>
 
-      <section className={`${styles.activitySection} reveal reveal-delay-3`} aria-labelledby="recent-customer-activity">
+      <section className={styles.activitySection} id="customer-activity" aria-labelledby="recent-customer-activity">
         <div className={styles.activitySectionHeading}>
           <div>
             <p className="eyebrow">Voice history</p>
             <h2 id="recent-customer-activity">Recent activity</h2>
           </div>
-          <span>Latest {customer.recent_conversations.length} of {customer.conversation_count}</span>
+          <span>Latest {customer.recent_conversations.length} of {customer.conversation_count} · summary view</span>
         </div>
 
         <div className={styles.activityPanel}>
@@ -262,7 +271,7 @@ export default async function CustomerDetailPage({
               return (
                 <article className={styles.activityRow} key={conversation.id}>
                   <span className={styles.activityIcon} aria-hidden="true">
-                    <UserRound size={17} strokeWidth={1.75} />
+                    <UserRound size={17} strokeWidth={1.75} aria-hidden="true" />
                   </span>
                   <span className={styles.activityCopy}>
                     <strong>{conversationTitle(conversation.resolution)}</strong>

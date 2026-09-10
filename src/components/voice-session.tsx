@@ -38,9 +38,9 @@ const stateContent: Record<VoicePhase, { eyebrow: string; title: string; detail:
     detail: "Start when you’re comfortable. Your account context will load securely.",
   },
   requesting: {
-    eyebrow: "Microphone access",
-    title: "One small permission.",
-    detail: "Allow microphone access in your browser to begin the conversation.",
+    eyebrow: "Preparing conversation",
+    title: "Setting things up…",
+    detail: "Creating a private session and checking the connection.",
   },
   connecting: {
     eyebrow: "Establishing session",
@@ -189,7 +189,7 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
     : content.eyebrow;
   const statusDetail = isDemo
     ? voiceState === "ready"
-      ? "This is a text-based demo. Starting requests microphone permission, but audio is not sent or transcribed. Use a suggested prompt to explore."
+      ? "This text-based demo runs without microphone access. Use a suggested prompt to explore."
       : voiceState === "listening"
         ? "Choose a suggested prompt below. This demo does not listen to or transcribe your voice."
         : voiceState === "speaking"
@@ -198,9 +198,11 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
     : content.detail;
   const statusTitle =
     voiceState === "listening" ? `Go ahead, ${profile.firstName}.` : content.title;
-  const announcedStatus = muted
-    ? "Microphone muted"
-    : `${statusEyebrow}. ${statusTitle}`;
+  const announcedStatus = errorMessage && (voiceState === "error" || voiceState === "ended")
+    ? ""
+    : muted
+      ? "Microphone muted"
+      : `${statusEyebrow}. ${statusTitle}`;
 
   const lastAgentMessage = useMemo(
     () => [...transcript].reverse().find((item) => item.speaker === "Svara"),
@@ -218,13 +220,13 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
           <p className="eyebrow">Voice room</p>
           <h1>Talk to {profile.agentName}</h1>
         </div>
-        <div className={styles.sessionMeta} aria-label="Session details">
+        <div className={styles.sessionMeta} role="group" aria-label="Session details">
           <span className={styles.secureBadge}>
-            <LockKeyhole size={13} strokeWidth={1.9} />
+            <LockKeyhole size={13} strokeWidth={1.9} aria-hidden="true" />
             {isDemo ? "Demo · text only" : providerTransport ? "Private session" : "Ready to connect"}
           </span>
           <span className={styles.timer}>
-            <Clock3 size={14} strokeWidth={1.8} />
+            <Clock3 size={14} strokeWidth={1.8} aria-hidden="true" />
             <time>{formatElapsed(elapsed)}</time>
           </span>
         </div>
@@ -246,7 +248,7 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
           <div className={styles.primaryActions} data-active={isActive}>
             {voiceState === "ready" && (
               <button className={styles.startButton} type="button" onClick={beginSession}>
-                <Mic size={18} strokeWidth={2} />
+                <Mic size={18} strokeWidth={2} aria-hidden="true" />
                 Start conversation
               </button>
             )}
@@ -261,11 +263,11 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
                   aria-label={muted ? "Unmute microphone" : "Mute microphone"}
                   aria-pressed={muted}
                 >
-                  {muted ? <MicOff size={20} /> : <Mic size={20} />}
+                  {muted ? <MicOff size={20} aria-hidden="true" /> : <Mic size={20} aria-hidden="true" />}
                   <span>{muted ? "Unmute" : "Mute"}</span>
                 </button>
                 <button className={`${styles.roundControl} ${styles.endControl}`} type="button" onClick={endSession}>
-                  <PhoneOff size={20} />
+                  <PhoneOff size={20} aria-hidden="true" />
                   <span>End</span>
                 </button>
               </>
@@ -273,34 +275,38 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
 
             {(voiceState === "ended" || voiceState === "error") && (
               <button className={styles.startButton} type="button" onClick={beginSession}>
-                <RotateCcw size={17} strokeWidth={2} />
+                <RotateCcw size={17} strokeWidth={2} aria-hidden="true" />
                 {voiceState === "error" ? "Try again" : "Start a new session"}
               </button>
             )}
           </div>
 
           {errorMessage && (voiceState === "error" || voiceState === "ended") && (
-            <p className={styles.errorNote}>{errorMessage}</p>
+            <p className={styles.errorNote} role="alert" aria-live="assertive">
+              {errorMessage}
+            </p>
           )}
 
-          <div className={styles.promptArea} aria-label="Conversation suggestions">
-            <span>Try asking</span>
-            <div className={styles.promptList}>
-              {suggestions.map((suggestion) => (
-                <button
-                  key={suggestion.prompt}
-                  className={styles.prompt}
-                  type="button"
-                  disabled={voiceState !== "listening" || muted || !supportsTextPrompts}
-                  aria-pressed={activePrompt === suggestion.prompt}
-                  onClick={() => sendPrompt(suggestion.prompt)}
-                >
-                  <Sparkles size={13} aria-hidden="true" />
-                  {suggestion.prompt}
-                </button>
-              ))}
+          {isDemo && (
+            <div className={styles.promptArea} role="group" aria-label="Demo conversation suggestions">
+              <span>Try asking</span>
+              <div className={styles.promptList}>
+                {suggestions.map((suggestion) => (
+                  <button
+                    key={suggestion.prompt}
+                    className={styles.prompt}
+                    type="button"
+                    disabled={voiceState !== "listening" || muted || !supportsTextPrompts}
+                    aria-pressed={activePrompt === suggestion.prompt}
+                    onClick={() => sendPrompt(suggestion.prompt)}
+                  >
+                    <Sparkles size={13} aria-hidden="true" />
+                    {suggestion.prompt}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </section>
 
         <aside className={styles.detailsPanel} aria-label="Session context">
@@ -310,8 +316,8 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
               <span>Your profile</span>
               <strong>{profile.fullName}</strong>
             </div>
-            <span className={styles.verified} aria-label="Verified customer">
-              <Check size={13} strokeWidth={2.4} />
+            <span className={styles.verified} role="img" aria-label="Verified customer">
+              <Check size={13} strokeWidth={2.4} aria-hidden="true" />
             </span>
           </div>
 
@@ -357,7 +363,8 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
                 ))
               )}
               {voiceState === "thinking" && (
-                <div className={styles.typing} aria-label={`${profile.agentName} is preparing a response`}>
+                <div className={styles.typing} role="status">
+                  <span className="sr-only">{profile.agentName} is preparing a response</span>
                   <i />
                   <i />
                   <i />
@@ -396,7 +403,7 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
           </details>
 
           <div className={styles.privacyNote}>
-            <ShieldCheck size={18} strokeWidth={1.7} />
+            <ShieldCheck size={18} strokeWidth={1.7} aria-hidden="true" />
             <div>
               <strong>Context protected</strong>
               <span>Identity and account access stay controlled by your secure session.</span>

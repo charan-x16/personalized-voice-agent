@@ -65,11 +65,11 @@ export default async function ConversationDetailPage({
 
   return (
     <div className={`${styles.workspace} ${styles.detailWorkspace}`}>
-      <Link href="/conversations" className={`${styles.backLink} reveal`}>
-        <ArrowLeft size={16} strokeWidth={1.8} /> All conversations
+      <Link href="/conversations" className={styles.backLink}>
+        <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" /> All conversations
       </Link>
 
-      <header className={`${styles.detailHeader} reveal`}>
+      <header className={styles.detailHeader}>
         <div>
           <div className={styles.detailEyebrowRow}>
             <p className="eyebrow">Conversation {shortConversationId(conversation.id)}</p>
@@ -81,30 +81,30 @@ export default async function ConversationDetailPage({
           <p>{preview}</p>
         </div>
         <Link href="/voice" className="button button-primary">
-          <AudioLines size={17} /> Start another
+          <AudioLines size={17} aria-hidden="true" /> Start another
         </Link>
       </header>
 
-      <dl className={`${styles.detailMeta} reveal reveal-delay-1`}>
+      <dl className={styles.detailMeta}>
         <div>
-          <dt><UserRound size={15} /> Customer</dt>
+          <dt><UserRound size={15} aria-hidden="true" /> Customer</dt>
           <dd>{profile.full_name}</dd>
         </div>
         <div>
-          <dt><CalendarDays size={15} /> Date</dt>
+          <dt><CalendarDays size={15} aria-hidden="true" /> Date</dt>
           <dd><LocalTime value={conversation.started_at} kind="datetime" /></dd>
         </div>
         <div>
-          <dt><Clock3 size={15} /> Duration</dt>
+          <dt><Clock3 size={15} aria-hidden="true" /> Duration</dt>
           <dd>{formatDuration(conversation.duration_seconds)}</dd>
         </div>
         <div>
-          <dt><Languages size={15} /> Language</dt>
+          <dt><Languages size={15} aria-hidden="true" /> Language</dt>
           <dd>{conversation.language}</dd>
         </div>
       </dl>
 
-      <div className={`${styles.detailGrid} reveal reveal-delay-2`}>
+      <div className={styles.detailGrid}>
         <section className={styles.transcriptPanel} aria-labelledby="transcript-title">
           <div className={styles.panelHeading}>
             <div>
@@ -127,9 +127,9 @@ export default async function ConversationDetailPage({
                   >
                     <span className={styles.speakerMark} aria-hidden="true">
                       {isAgent ? (
-                        <Sparkles size={17} strokeWidth={1.7} />
+                        <Sparkles size={17} strokeWidth={1.7} aria-hidden="true" />
                       ) : isTool ? (
-                        <Database size={16} strokeWidth={1.7} />
+                        <Database size={16} strokeWidth={1.7} aria-hidden="true" />
                       ) : (
                         profile.initials
                       )}

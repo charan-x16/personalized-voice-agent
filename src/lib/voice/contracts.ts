@@ -35,7 +35,7 @@ export type VoiceTransportEvent =
 
 export type VoiceTransportStartOptions = {
   connection: VoiceSessionResponse["connection"];
-  microphone: MediaStream;
+  microphone: MediaStream | null;
   signal: AbortSignal;
   onEvent: (event: VoiceTransportEvent) => void;
 };

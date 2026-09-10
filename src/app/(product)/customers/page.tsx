@@ -108,13 +108,13 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
   const metrics = [
     { label: "Customer records", value: compactNumber(data.total), note: status === "all" ? "Tenant directory" : `${status} filter` },
     { label: "Active in view", value: String(activeCount), note: `${data.items.length} shown` },
-    { label: "Conversations", value: compactNumber(conversationCount), note: "Current page" },
-    { label: "Resolved", value: resolvedRate, note: "Current page" },
+    { label: "Conversations in view", value: compactNumber(conversationCount), note: "Current page" },
+    { label: "Resolution in view", value: resolvedRate, note: "Current page" },
   ];
 
   return (
     <div className={styles.workspace}>
-      <header className={`${styles.pageHeader} reveal`}>
+      <header className={styles.pageHeader}>
         <div>
           <p className="eyebrow">Workspace directory</p>
           <h1 className={`${styles.pageTitle} display-type`}>Customers</h1>
@@ -128,7 +128,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
         </div>
       </header>
 
-      <dl className={`${styles.metrics} reveal reveal-delay-1`} aria-label="Customer directory metrics">
+      <dl className={styles.metrics} aria-label="Customer directory metrics">
         {metrics.map((metric) => (
           <div key={metric.label}>
             <dt>{metric.label}</dt>
@@ -138,7 +138,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
         ))}
       </dl>
 
-      <section className={`${styles.directory} reveal reveal-delay-2`} aria-labelledby="directory-title">
+      <section className={styles.directory} aria-labelledby="directory-title">
         <div className={styles.directoryHeading}>
           <div>
             <p className="eyebrow">Customer profiles</p>
@@ -280,7 +280,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
         ) : (
           <div className={styles.emptyState}>
             <span aria-hidden="true">
-              {query || status !== "all" ? <Search size={21} /> : <UsersRound size={21} />}
+              {query || status !== "all" ? <Search size={21} aria-hidden="true" /> : <UsersRound size={21} aria-hidden="true" />}
             </span>
             <h3>{query || status !== "all" ? "No matching customers" : "Your directory is ready"}</h3>
             <p>

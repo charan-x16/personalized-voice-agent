@@ -1,6 +1,7 @@
 import type { VoiceSessionResponse } from "@/lib/api-types";
 
 import type { VoiceTransport } from "./contracts";
+import { voiceTransportRequiresMicrophone } from "./microphone";
 import { MockVoiceTransport } from "./mock-transport";
 import { WebSocketVoiceTransport } from "./websocket-transport";
 
@@ -15,7 +16,7 @@ export function createVoiceTransport({
   mockGreeting,
   responseForPrompt,
 }: CreateVoiceTransportOptions): VoiceTransport {
-  if (session.connection.transport === "mock") {
+  if (!voiceTransportRequiresMicrophone(session.connection.transport)) {
     return new MockVoiceTransport({
       greeting: mockGreeting,
       responseForPrompt,

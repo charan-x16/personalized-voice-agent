@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { conversationPage, conversationArchiveHref } from "../../src/lib/conversation-query.ts";
 import { isNearTranscriptBottom } from "../../src/lib/voice/transcript-scroll.ts";
+import {
+  INDIAN_LANGUAGE_COUNT,
+  SELECTABLE_LANGUAGES,
+  SUPPORTED_LANGUAGES,
+  supportedLanguageByCode,
+} from "../../src/lib/languages.ts";
 
 test("archive pagination rejects ambiguous and unbounded page parameters", () => {
   assert.equal(conversationPage(undefined), 1);
@@ -25,4 +31,13 @@ test("transcript follows new messages only when near the bottom", () => {
   assert.equal(isNearTranscriptBottom(700, 1000, 260), true);
   assert.equal(isNearTranscriptBottom(100, 1000, 260), false);
   assert.equal(isNearTranscriptBottom(739.5, 1000, 260), true);
+});
+
+test("the shared language catalogue matches the supported Voice Agents surface", () => {
+  assert.equal(INDIAN_LANGUAGE_COUNT, 11);
+  assert.equal(SUPPORTED_LANGUAGES.length, 12);
+  assert.equal(SELECTABLE_LANGUAGES.length, 12);
+  assert.equal(new Set(SUPPORTED_LANGUAGES.map((language) => language.code)).size, 12);
+  assert.equal(supportedLanguageByCode("hi")?.nativeName, "हिन्दी");
+  assert.equal(supportedLanguageByCode("kok"), undefined);
 });

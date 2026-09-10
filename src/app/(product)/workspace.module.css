@@ -1639,8 +1639,14 @@
   }
 }
 
-/* Workspace typography is functional; editorial serif stays on marketing accents. */
-.pageTitle,
+/* Editorial headings connect the product workspace to Svara's public identity. */
+.pageTitle {
+  font-family: var(--font-serif);
+  font-weight: 480;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
 .detailTitle {
   font-family: var(--font-sans);
   font-weight: 600;
