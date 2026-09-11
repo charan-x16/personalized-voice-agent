@@ -28,7 +28,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await database.create_schema()
             if application_settings.seed_demo_data:
                 async with database.session_factory() as session:
-                    await seed_demo_data(session)
+                    await seed_demo_data(
+                        session,
+                        owner_email=application_settings.seed_owner_email,
+                        owner_name=application_settings.seed_owner_name,
+                    )
             yield
         finally:
             shutdown = getattr(voice_provider, "shutdown", None)

@@ -4,14 +4,17 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # ".env" is the template-copied file; ".env.local" is an optional, never-
+        # templated overlay that wins, so re-running `cp .env.example .env` cannot
+        # destroy configured secrets.
+        env_file=(".env", ".env.local"),
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
@@ -43,6 +46,8 @@ class Settings(BaseSettings):
     voice_provider: Literal["mock", "sarvam"] = "mock"
     enable_demo_auth: bool = False
     seed_demo_data: bool = False
+    seed_owner_email: str | None = None
+    seed_owner_name: str = "Workspace Owner"
 
     sarvam_api_key: str | None = Field(default=None, repr=False)
     sarvam_org_id: str | None = None
@@ -53,6 +58,26 @@ class Settings(BaseSettings):
 
     clerk_secret_key: str | None = Field(default=None, repr=False)
     clerk_jwt_key: str | None = Field(default=None, repr=False)
+
+    @field_validator(
+        "database_ca_cert_file",
+        "database_pooler_host",
+        "seed_owner_email",
+        "sarvam_api_key",
+        "sarvam_org_id",
+        "sarvam_workspace_id",
+        "sarvam_agent_id",
+        "sarvam_agent_version",
+        "clerk_secret_key",
+        "clerk_jwt_key",
+        mode="before",
+    )
+    @classmethod
+    def _blank_to_none(cls, value: object) -> object:
+        """Treat blank env vars (``KEY=``) as unset instead of invalid values."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @property
     def cors_origins(self) -> list[str]:

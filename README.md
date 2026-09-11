@@ -88,12 +88,12 @@ From the repository root:
 
 ```bash
 cd apps/api
-cp .env.example .env
+cp -n .env.example .env
 uv sync --dev
 uv run uvicorn svara_api.main:app --reload
 ```
 
-On PowerShell, use `Copy-Item .env.example .env` instead of `cp`. The API is available at [http://localhost:8000](http://localhost:8000), with OpenAPI documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
+On PowerShell, use `if (-not (Test-Path .env)) { Copy-Item .env.example .env }` instead of `cp -n`. Both forms deliberately refuse to overwrite an existing `.env`: re-running the copy without `-n` replaces configured secrets such as `CLERK_SECRET_KEY` with blank template values. To restart the server later, run only the `uvicorn` line. The API is available at [http://localhost:8000](http://localhost:8000), with OpenAPI documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
 
 The default backend configuration creates `apps/api/svara.db` and idempotently seeds these application profiles:
 

@@ -28,6 +28,9 @@ DEMO_ORDER_ID = "00000000-0000-4000-8000-000000000004"
 DEMO_EMAIL = "rahul@example.com"
 DEMO_ADMIN_USER_ID = "00000000-0000-4000-8000-000000000005"
 DEMO_ADMIN_EMAIL = "ananya@acme.example"
+OWNER_CUSTOMER_ID = "00000000-0000-4000-8000-000000000030"
+OWNER_USER_ID = "00000000-0000-4000-8000-000000000031"
+OWNER_CUSTOMER_REF = "CUS-1500"
 
 _DEMO_CUSTOMERS = (
     {
@@ -114,7 +117,69 @@ _DEMO_CAFE_TABLES = (
 )
 
 
-async def seed_demo_data(session: AsyncSession) -> None:
+async def _seed_owner_account(
+    session: AsyncSession,
+    *,
+    tenant: Tenant,
+    email: str,
+    display_name: str,
+) -> Customer | None:
+    """Seed a local sign-in account so a real identity provider user resolves to a profile."""
+
+    normalized_email = email.strip().casefold()
+    normalized_name = display_name.strip() or "Workspace Owner"
+    if not normalized_email:
+        return None
+
+    customer = await session.scalar(
+        select(Customer).where(
+            Customer.tenant_id == tenant.id,
+            Customer.external_ref == OWNER_CUSTOMER_REF,
+        )
+    )
+    if customer is None:
+        if await session.get(Customer, OWNER_CUSTOMER_ID) is not None:
+            return None
+        customer = Customer(
+            id=OWNER_CUSTOMER_ID,
+            tenant_id=tenant.id,
+            external_ref=OWNER_CUSTOMER_REF,
+            full_name=normalized_name,
+            preferred_language="English",
+            plan_name="Premium",
+            phone_hash=sha256(normalized_email.encode("utf-8")).hexdigest(),
+            is_active=True,
+        )
+        session.add(customer)
+        await session.flush()
+
+    existing_user = await session.scalar(
+        select(User).where(
+            User.tenant_id == tenant.id,
+            User.email == normalized_email,
+        )
+    )
+    if existing_user is None and await session.get(User, OWNER_USER_ID) is None:
+        session.add(
+            User(
+                id=OWNER_USER_ID,
+                tenant_id=tenant.id,
+                customer_id=customer.id,
+                email=normalized_email,
+                display_name=normalized_name,
+                role="customer",
+            )
+        )
+        await session.flush()
+    return customer
+
+
+async def seed_demo_data(
+    session: AsyncSession,
+    *,
+    owner_email: str | None = None,
+    owner_name: str = "Workspace Owner",
+) -> None:
     tenant = await session.scalar(
         select(Tenant).where(
             or_(Tenant.id == DEMO_TENANT_ID, Tenant.slug == "acme"),
@@ -196,6 +261,15 @@ async def seed_demo_data(session: AsyncSession) -> None:
                 role="admin",
             )
         )
+    if owner_email:
+        owner_customer = await _seed_owner_account(
+            session,
+            tenant=tenant,
+            email=owner_email,
+            display_name=owner_name,
+        )
+        if owner_customer is not None:
+            customers_by_ref[OWNER_CUSTOMER_REF] = owner_customer
     await session.flush()
 
     for customer in customers_by_ref.values():
