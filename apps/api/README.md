@@ -10,12 +10,12 @@ Requires Python 3.11 or newer and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 cd apps/api
-cp .env.example .env
+cp -n .env.example .env
 uv sync --dev
 uv run uvicorn svara_api.main:app --reload
 ```
 
-On PowerShell, use `Copy-Item .env.example .env` instead of `cp`. The default configuration creates `svara.db`, seeds the customer login `rahul@example.com`, the tenant-admin login `ananya@acme.example`, and a small customer directory, then serves interactive documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
+On PowerShell, use `if (-not (Test-Path .env)) { Copy-Item .env.example .env }` instead of `cp -n`. Both forms deliberately refuse to overwrite an existing `.env`: re-running the copy without `-n` replaces configured secrets such as `CLERK_SECRET_KEY` with blank template values. To restart the server later, run only the `uvicorn` line. The default configuration creates `svara.db`, seeds the customer login `rahul@example.com`, the tenant-admin login `ananya@acme.example`, and a small customer directory, then serves interactive documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
 
 ## Run the wired web flow
 
