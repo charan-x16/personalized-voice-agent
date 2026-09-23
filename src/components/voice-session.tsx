@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowLeft,
   Check,
   ChevronDown,
   Clock3,
@@ -12,6 +13,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useVoiceSession, type VoiceSuggestion } from "@/hooks/use-voice-session";
@@ -29,6 +31,13 @@ export type VoiceProfile = {
   agentName: string;
   openingMessage: string;
   isDemo: boolean;
+};
+
+type VoiceSessionProps = {
+  profile: VoiceProfile;
+  mode?: "customer" | "admin-preview";
+  returnHref?: string;
+  sessionEndpoint?: string;
 };
 
 const stateContent: Record<VoicePhase, { eyebrow: string; title: string; detail: string }> = {
@@ -130,23 +139,29 @@ function AcousticRibbon({ state }: { state: VoicePhase }) {
   );
 }
 
-export function VoiceSession({ profile }: { profile: VoiceProfile }) {
+export function VoiceSession({
+  profile,
+  mode = "customer",
+  returnHref,
+  sessionEndpoint,
+}: VoiceSessionProps) {
+  const isAdminPreview = mode === "admin-preview";
   const suggestions = useMemo<VoiceSuggestion[]>(
     () => [
       {
-        prompt: "Which plan am I on?",
-        response: `You're on the ${profile.planName} plan. I can use that context while helping with this conversation.`,
+        prompt: isAdminPreview ? "Which plan is this customer on?" : "Which plan am I on?",
+        response: `${isAdminPreview ? `${profile.firstName} is` : "You're"} on the ${profile.planName} plan. I can use that context while helping with this conversation.`,
       },
       {
-        prompt: "Which language do I prefer?",
-        response: `Your saved preference is ${profile.preferredLanguage}. A live provider can use it when the session starts.`,
+        prompt: isAdminPreview ? "Which language does this customer prefer?" : "Which language do I prefer?",
+        response: `${isAdminPreview ? `${profile.firstName}'s` : "Your"} saved preference is ${profile.preferredLanguage}. A live provider can use it when the session starts.`,
       },
       {
         prompt: "How is my data protected?",
         response: `This session is scoped to your verified ${profile.workspaceName} profile. The browser never receives the private database lookup key.`,
       },
     ],
-    [profile.planName, profile.preferredLanguage, profile.workspaceName],
+    [isAdminPreview, profile.firstName, profile.planName, profile.preferredLanguage, profile.workspaceName],
   );
   const {
     state,
@@ -162,6 +177,7 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
     openingMessage: profile.openingMessage,
     preferredLanguage: profile.preferredLanguage,
     suggestions,
+    sessionEndpoint,
   });
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const followTranscriptRef = useRef(true);
@@ -187,7 +203,7 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
   const statusEyebrow = isDemo && ["ready", "listening", "speaking"].includes(voiceState)
     ? voiceState === "listening" ? "Choose a prompt" : voiceState === "speaking" ? "Demo response" : "Text-only demo"
     : content.eyebrow;
-  const statusDetail = isDemo
+  const defaultStatusDetail = isDemo
     ? voiceState === "ready"
       ? "This text-based demo runs without microphone access. Use a suggested prompt to explore."
       : voiceState === "listening"
@@ -196,8 +212,15 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
           ? "Your demo response is shown in the transcript. No voice audio is playing."
           : content.detail
     : content.detail;
+  const statusDetail = isAdminPreview && voiceState === "ready"
+    ? `Start a read-only test using ${profile.firstName}'s approved customer context. Data-changing tools stay disabled.`
+    : isAdminPreview && voiceState === "ended"
+      ? "The preview is closed and is not included in the customer's conversation history."
+      : defaultStatusDetail;
   const statusTitle =
-    voiceState === "listening" ? `Go ahead, ${profile.firstName}.` : content.title;
+    voiceState === "listening"
+      ? isAdminPreview ? `Test ${profile.agentName} as ${profile.firstName}.` : `Go ahead, ${profile.firstName}.`
+      : content.title;
   const announcedStatus = errorMessage && (voiceState === "error" || voiceState === "ended")
     ? ""
     : muted
@@ -217,10 +240,23 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
     <div className={styles.page} data-active={isActive}>
       <div className={styles.topbar}>
         <div>
-          <p className="eyebrow">Voice room</p>
-          <h1>Talk to {profile.agentName}</h1>
+          {isAdminPreview && returnHref ? (
+            <Link href={returnHref} className={styles.returnLink}>
+              <ArrowLeft size={15} strokeWidth={1.9} aria-hidden="true" />
+              Back to customer profile
+            </Link>
+          ) : (
+            <p className="eyebrow">Voice room</p>
+          )}
+          <h1>{isAdminPreview ? `Preview ${profile.agentName}` : `Talk to ${profile.agentName}`}</h1>
         </div>
         <div className={styles.sessionMeta} role="group" aria-label="Session details">
+          {isAdminPreview && (
+            <span className={styles.previewBadge}>
+              <ShieldCheck size={13} strokeWidth={1.9} aria-hidden="true" />
+              Read-only preview
+            </span>
+          )}
           <span className={styles.secureBadge}>
             <LockKeyhole size={13} strokeWidth={1.9} aria-hidden="true" />
             {isDemo ? "Demo · text only" : providerTransport ? "Private session" : "Ready to connect"}
@@ -233,7 +269,16 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
       </div>
 
       <div className={styles.workspace}>
-        <section className={styles.callPanel} aria-label="Voice conversation">
+        <section className={styles.callPanel} aria-label={isAdminPreview ? "Administrator voice preview" : "Voice conversation"}>
+          {isAdminPreview && (
+            <div className={styles.previewNotice} role="note">
+              <ShieldCheck size={17} strokeWidth={1.8} aria-hidden="true" />
+              <span>
+                <strong>Administrator preview</strong>
+                Customer lookup is available. Reservations and other data-changing actions are blocked.
+              </span>
+            </div>
+          )}
           <div className={styles.statusCopy}>
             <span className={styles.statusLine}>
               <i aria-hidden="true" data-state={voiceState} />
@@ -249,7 +294,7 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
             {voiceState === "ready" && (
               <button className={styles.startButton} type="button" onClick={beginSession}>
                 <Mic size={18} strokeWidth={2} aria-hidden="true" />
-                Start conversation
+                {isAdminPreview ? "Start read-only preview" : "Start conversation"}
               </button>
             )}
 
@@ -276,7 +321,7 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
             {(voiceState === "ended" || voiceState === "error") && (
               <button className={styles.startButton} type="button" onClick={beginSession}>
                 <RotateCcw size={17} strokeWidth={2} aria-hidden="true" />
-                {voiceState === "error" ? "Try again" : "Start a new session"}
+                {voiceState === "error" ? "Try again" : isAdminPreview ? "Start another preview" : "Start a new session"}
               </button>
             )}
           </div>
@@ -313,10 +358,10 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
           <div className={styles.contextHeading}>
             <div className={styles.customerAvatar}>{profile.initials}</div>
             <div>
-              <span>Your profile</span>
+              <span>{isAdminPreview ? "Customer under test" : "Your profile"}</span>
               <strong>{profile.fullName}</strong>
             </div>
-            <span className={styles.verified} role="img" aria-label="Verified customer">
+            <span className={styles.verified} role="img" aria-label="Verified customer profile">
               <Check size={13} strokeWidth={2.4} aria-hidden="true" />
             </span>
           </div>
@@ -394,10 +439,12 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
               </div>
               <div>
                 <span>Data scope</span>
-                <strong>Verified profile</strong>
+                <strong>{isAdminPreview ? "Read-only profile" : "Verified profile"}</strong>
               </div>
               <p>
-                Only the information needed to answer this conversation is shared with the assistant.
+                {isAdminPreview
+                  ? "Only approved customer context is shared. This preview cannot change reservations or customer data."
+                  : "Only the information needed to answer this conversation is shared with the assistant."}
               </p>
             </div>
           </details>
@@ -406,7 +453,11 @@ export function VoiceSession({ profile }: { profile: VoiceProfile }) {
             <ShieldCheck size={18} strokeWidth={1.7} aria-hidden="true" />
             <div>
               <strong>Context protected</strong>
-              <span>Identity and account access stay controlled by your secure session.</span>
+              <span>
+                {isAdminPreview
+                  ? "This preview is attributed to your administrator account and kept out of customer history."
+                  : "Identity and account access stay controlled by your secure session."}
+              </span>
             </div>
           </div>
 

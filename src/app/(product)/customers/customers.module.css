@@ -49,6 +49,43 @@
   font-weight: 690;
 }
 
+.directoryHeaderActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.directoryHeaderActions .scopeNote {
+  margin-bottom: 0;
+}
+
+.onboardingHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.72fr);
+  gap: 48px;
+  align-items: end;
+  margin: 28px 0 30px;
+}
+
+.onboardingSteps {
+  display: grid;
+  gap: 9px;
+  padding: 17px 18px;
+  background: rgba(223, 233, 225, 0.42);
+  border: 1px solid rgba(88, 114, 97, 0.15);
+  border-radius: var(--radius-md);
+}
+
+.onboardingSteps span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #3b5845;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -555,7 +592,48 @@
 }
 
 .detailHeaderStatus {
-  margin-bottom: 8px;
+  margin-bottom: 0;
+}
+
+.detailHeaderActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.previewAgentButton {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-pill);
+  color: var(--paper);
+  font-size: var(--text-sm);
+  font-weight: 680;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.previewAgentButton:hover {
+  background: #2b2a26;
+  border-color: #2b2a26;
+  transform: translateY(-1px);
+}
+
+.previewAgentButtonDisabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.previewAgentButtonDisabled:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  transform: none;
 }
 
 .detailMeta {
@@ -1347,6 +1425,11 @@
   .profileAside {
     grid-template-columns: 1fr 1fr;
   }
+
+  .onboardingHeader {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
 }
 
 @media (max-width: 780px) {
@@ -1424,6 +1507,24 @@
     align-items: flex-start;
     flex-direction: column;
     gap: 21px;
+  }
+
+  .detailHeaderActions {
+    width: 100%;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .directoryHeaderActions {
+    width: 100%;
+  }
+
+  .directoryHeaderActions > a {
+    width: 100%;
+  }
+
+  .onboardingHeader {
+    margin-top: 22px;
   }
 
   .pageIntro {

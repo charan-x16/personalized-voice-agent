@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import sqlite3
 from collections.abc import Iterator, Mapping
@@ -22,6 +23,7 @@ from sarvam_conv_ai_sdk.messages.text import ServerTranscriptMsg
 from sqlalchemy import MetaData, create_engine, event
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.websockets import WebSocketDisconnect
+from svix.webhooks import Webhook
 
 from alembic import command
 from svara_api.agent_configuration import (
@@ -41,7 +43,17 @@ from svara_api.security import (
     hash_conversation_ref,
     verify_clerk_session,
 )
-from svara_api.seed import DEMO_ADMIN_EMAIL, DEMO_ADMIN_USER_ID
+from svara_api.seed import (
+    DEMO_ADMIN_EMAIL,
+    DEMO_ADMIN_USER_ID,
+    DEMO_CUSTOMER_ID,
+    DEMO_USER_ID,
+)
+from svara_api.services.clerk_invitations import (
+    AccessInvitation,
+    InvitationProviderError,
+)
+from svara_api.services.invitation_outbox import process_ready_invitation_jobs
 from svara_api.services.voice_provider import (
     SarvamVoiceProvider,
     VoiceProviderSession,
@@ -65,9 +77,53 @@ def _login(client: TestClient, email: str = "rahul@example.com") -> str:
     return str(payload["access_token"])
 
 
+class StubInvitationProvider:
+    def __init__(self, *, fail_create: bool = False, fail_revoke: bool = False) -> None:
+        self.fail_create = fail_create
+        self.fail_revoke = fail_revoke
+        self.calls: list[tuple[str, str]] = []
+        self.invitation_number = 0
+
+    async def create_invitation(self, *, email: str) -> AccessInvitation:
+        self.calls.append(("create", email))
+        if self.fail_create:
+            raise InvitationProviderError(retry_after_seconds=17)
+        self.invitation_number += 1
+        now = datetime.now(UTC)
+        return AccessInvitation(
+            invitation_id=f"inv_test_{self.invitation_number}",
+            sent_at=now,
+            expires_at=now + timedelta(days=30),
+        )
+
+    async def find_pending_invitation(self, *, email: str) -> AccessInvitation | None:
+        return None
+
+    async def revoke_invitation(self, *, invitation_id: str) -> None:
+        self.calls.append(("revoke", invitation_id))
+        if self.fail_revoke:
+            raise InvitationProviderError(retry_after_seconds=23)
+
+
 def _create_session(client: TestClient, token: str, **body: Any) -> dict[str, Any]:
     response = client.post(
         "/v1/voice/sessions",
+        headers={"Authorization": f"Bearer {token}"},
+        json=body,
+    )
+    assert response.status_code == 201, response.text
+    assert response.headers["cache-control"] == "no-store"
+    return response.json()
+
+
+def _create_preview_session(
+    client: TestClient,
+    token: str,
+    customer_id: str = DEMO_CUSTOMER_ID,
+    **body: Any,
+) -> dict[str, Any]:
+    response = client.post(
+        f"/v1/voice/customers/{customer_id}/preview-sessions",
         headers={"Authorization": f"Bearer {token}"},
         json=body,
     )
@@ -121,6 +177,16 @@ def _mock_clerk_identity(
         fetch_clerk_primary_email,
     )
     return calls
+
+
+def _signed_webhook_headers(*, secret: str, message_id: str, body: str) -> dict[str, str]:
+    timestamp = datetime.now(UTC)
+    return {
+        "Content-Type": "application/json",
+        "svix-id": message_id,
+        "svix-timestamp": str(int(timestamp.timestamp())),
+        "svix-signature": Webhook(secret).sign(message_id, timestamp, body),
+    }
 
 
 def _query_one(
@@ -528,9 +594,10 @@ def test_clerk_bearer_links_and_resolves_active_application_user(
     assert first_response.json()["role"] == "customer"
     assert _query_one(
         database_path,
-        "SELECT clerk_user_id FROM users WHERE lower(email) = ?",
+        "SELECT clerk_user_id, invitation_status, invitation_accepted_at IS NOT NULL "
+        "FROM users WHERE lower(email) = ?",
         ("rahul@example.com",),
-    ) == ("user_clerk_test_123",)
+    ) == ("user_clerk_test_123", "accepted", 1)
     assert calls == [
         {
             "operation": "verify",
@@ -622,6 +689,180 @@ def test_clerk_bearer_rejects_unlinked_email(
     assert response.headers["www-authenticate"] == "Bearer"
 
 
+def test_clerk_webhook_is_verified_idempotent_and_reconciles_user_lifecycle(
+    tmp_path: Path,
+) -> None:
+    secret = "whsec_" + base64.b64encode(b"svara-test-webhook-signing-key-32").decode()
+    database_path = tmp_path / "clerk-webhook.sqlite3"
+    settings = settings_for_database(
+        database_path,
+        clerk_webhook_signing_secret=secret,
+    )
+    app = create_app(settings)
+
+    with TestClient(app) as client:
+        provider = StubInvitationProvider()
+        client.app.state.invitation_provider = provider
+        admin_token = _login(client, DEMO_ADMIN_EMAIL)
+        created = client.post(
+            "/v1/customers",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={"full_name": "Webhook User", "email": "webhook@example.com"},
+        )
+        assert created.status_code == 201, created.text
+
+        event = {
+            "data": {
+                "id": "user_webhook_123",
+                "primary_email_address_id": "idn_primary",
+                "email_addresses": [
+                    {
+                        "id": "idn_primary",
+                        "email_address": "webhook@example.com",
+                        "verification": {"status": "verified"},
+                    }
+                ],
+                "banned": False,
+                "locked": False,
+                "deprovisioned": False,
+            },
+            "object": "event",
+            "timestamp": int(datetime.now(UTC).timestamp() * 1_000),
+            "type": "user.created",
+        }
+        body = json.dumps(event, separators=(",", ":"))
+        headers = _signed_webhook_headers(
+            secret=secret,
+            message_id="msg_user_created_123",
+            body=body,
+        )
+
+        invalid = client.post(
+            "/v1/webhooks/clerk",
+            content=body,
+            headers={**headers, "svix-signature": "v1,invalid"},
+        )
+        assert invalid.status_code == 400
+
+        first = client.post("/v1/webhooks/clerk", content=body, headers=headers)
+        duplicate = client.post("/v1/webhooks/clerk", content=body, headers=headers)
+        assert first.status_code == 200, first.text
+        assert first.json() == {"received": True, "duplicate": False, "status": "processed"}
+        assert duplicate.status_code == 200
+        assert duplicate.json()["duplicate"] is True
+        assert _query_one(
+            database_path,
+            "SELECT clerk_user_id, invitation_status, is_active FROM users WHERE email = ?",
+            ("webhook@example.com",),
+        ) == ("user_webhook_123", "accepted", 1)
+
+        deleted_event = {
+            "data": {"id": "user_webhook_123", "deleted": True},
+            "object": "event",
+            "timestamp": event["timestamp"] + 1_000,
+            "type": "user.deleted",
+        }
+        deleted_body = json.dumps(deleted_event, separators=(",", ":"))
+        deleted = client.post(
+            "/v1/webhooks/clerk",
+            content=deleted_body,
+            headers=_signed_webhook_headers(
+                secret=secret,
+                message_id="msg_user_deleted_123",
+                body=deleted_body,
+            ),
+        )
+        assert deleted.status_code == 200, deleted.text
+        assert _query_one(
+            database_path,
+            "SELECT clerk_user_id, invitation_status, is_active FROM users WHERE email = ?",
+            ("webhook@example.com",),
+        ) == (None, "revoked", 0)
+        assert _query_one(
+            database_path,
+            "SELECT COUNT(*) FROM clerk_webhook_events",
+        ) == (2,)
+
+
+def test_webhook_linked_access_supersedes_a_queued_invitation_retry(tmp_path: Path) -> None:
+    secret = "whsec_" + base64.b64encode(b"svara-test-webhook-linked-key-32-bytes").decode()
+    database_path = tmp_path / "clerk-webhook-supersedes-outbox.sqlite3"
+    settings = settings_for_database(
+        database_path,
+        clerk_webhook_signing_secret=secret,
+        clerk_outbox_retry_base_seconds=1,
+        clerk_outbox_retry_max_seconds=1,
+    )
+    app = create_app(settings)
+
+    with TestClient(app) as client:
+        provider = StubInvitationProvider(fail_create=True)
+        client.app.state.invitation_provider = provider
+        admin_token = _login(client, DEMO_ADMIN_EMAIL)
+        created = client.post(
+            "/v1/customers",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={"full_name": "Linked User", "email": "linked@example.com"},
+        )
+        assert created.status_code == 201
+        assert created.json()["access"]["status"] == "queued"
+
+        event = {
+            "data": {
+                "id": "user_linked_123",
+                "primary_email_address_id": "idn_linked_primary",
+                "email_addresses": [
+                    {
+                        "id": "idn_linked_primary",
+                        "email_address": "linked@example.com",
+                        "verification": {"status": "verified"},
+                    }
+                ],
+                "banned": False,
+                "locked": False,
+                "deprovisioned": False,
+            },
+            "object": "event",
+            "timestamp": int(datetime.now(UTC).timestamp() * 1_000),
+            "type": "user.created",
+        }
+        body = json.dumps(event, separators=(",", ":"))
+        linked = client.post(
+            "/v1/webhooks/clerk",
+            content=body,
+            headers=_signed_webhook_headers(
+                secret=secret,
+                message_id="msg_linked_before_retry",
+                body=body,
+            ),
+        )
+        assert linked.status_code == 200
+
+        with sqlite3.connect(database_path) as connection:
+            connection.execute(
+                "UPDATE clerk_invitation_outbox SET available_at = ? WHERE status = 'pending'",
+                ("2000-01-01 00:00:00+00:00",),
+            )
+            connection.commit()
+        provider.fail_create = False
+        results = asyncio.run(
+            process_ready_invitation_jobs(
+                app.state.database.session_factory,
+                provider=provider,
+                settings=settings,
+                worker_id="test-worker",
+            )
+        )
+        assert [result.state for result in results] == ["succeeded"]
+
+    assert provider.calls == [("create", "linked@example.com")]
+    assert _query_one(
+        database_path,
+        "SELECT clerk_user_id, invitation_status, is_active FROM users WHERE email = ?",
+        ("linked@example.com",),
+    ) == ("user_linked_123", "accepted", 1)
+
+
 @pytest.mark.parametrize(
     "authorization",
     [None, "Basic not-a-bearer-token", "Bearer not-a-valid-token"],
@@ -668,15 +909,100 @@ def test_authenticated_customer_can_create_a_voice_session(api: ApiHarness) -> N
     assert session["connection"]["websocket_url"] is None
     assert session["connection"]["expires_at"] == session["expires_at"]
 
-    stored_hash, stored_provider, stored_status = _query_one(
+    stored_hash, stored_provider, stored_status, session_mode, initiated_by = _query_one(
         api.database_path,
-        "SELECT conversation_ref_hash, provider, status FROM voice_sessions WHERE id = ?",
+        (
+            "SELECT conversation_ref_hash, provider, status, session_mode, "
+            "initiated_by_user_id FROM voice_sessions WHERE id = ?"
+        ),
         (session["session_id"],),
     )
     assert stored_hash == hash_conversation_ref(TEST_CONVERSATION_REF)
     assert stored_hash != TEST_CONVERSATION_REF
     assert stored_provider == "mock"
     assert stored_status == "ready"
+    assert session_mode == "customer"
+    assert initiated_by == DEMO_USER_ID
+
+
+def test_admin_can_create_and_cancel_an_auditable_read_only_preview(
+    api: ApiHarness,
+) -> None:
+    admin_token = _login(api.client, DEMO_ADMIN_EMAIL)
+    session = _create_preview_session(api.client, admin_token, language=" Marathi ")
+
+    stored = _query_one(
+        api.database_path,
+        (
+            "SELECT customer_id, session_mode, initiated_by_user_id, language "
+            "FROM voice_sessions WHERE id = ?"
+        ),
+        (session["session_id"],),
+    )
+    assert stored == (DEMO_CUSTOMER_ID, "admin_preview", DEMO_ADMIN_USER_ID, "Marathi")
+
+    started = api.client.post(
+        "/v1/sarvam/hooks/on-start",
+        headers=_tool_headers(),
+        json={
+            "conversation_ref": TEST_CONVERSATION_REF,
+            "interaction_id": "interaction-admin-preview",
+        },
+    )
+    assert started.status_code == 200, started.text
+    instructions = started.json()["agent"]["instructions"]
+    assert "Administrator preview mode is active" in instructions
+    assert "must not create, reschedule, cancel" in instructions
+
+    customer_token = _login(api.client)
+    hidden_from_customer = api.client.post(
+        f"/v1/voice/sessions/{session['session_id']}/cancel",
+        headers={"Authorization": f"Bearer {customer_token}"},
+    )
+    assert hidden_from_customer.status_code == 404
+
+    cancelled = api.client.post(
+        f"/v1/voice/sessions/{session['session_id']}/cancel",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "cancelled"
+
+
+def test_customer_cannot_start_an_admin_preview(api: ApiHarness) -> None:
+    token = _login(api.client)
+
+    response = api.client.post(
+        f"/v1/voice/customers/{DEMO_CUSTOMER_ID}/preview-sessions",
+        headers={"Authorization": f"Bearer {token}"},
+        json={},
+    )
+
+    assert response.status_code == 403
+    assert _count(api.database_path, "voice_sessions") == 0
+
+
+def test_admin_preview_requires_an_active_customer_in_the_same_tenant(
+    api: ApiHarness,
+) -> None:
+    _insert_out_of_scope_orders(api.database_path)
+    token = _login(api.client, DEMO_ADMIN_EMAIL)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    inactive = api.client.post(
+        "/v1/voice/customers/00000000-0000-4000-8000-000000000008/preview-sessions",
+        headers=headers,
+        json={},
+    )
+    cross_tenant = api.client.post(
+        "/v1/voice/customers/20000000-0000-4000-8000-000000000002/preview-sessions",
+        headers=headers,
+        json={},
+    )
+
+    assert inactive.status_code == 404
+    assert cross_tenant.status_code == 404
+    assert _count(api.database_path, "voice_sessions") == 0
 
 
 def test_provider_receives_opaque_ref_without_exposing_it_and_terminal_race_wins(
@@ -1800,6 +2126,97 @@ def test_reservation_tools_complete_an_idempotent_customer_scoped_lifecycle(
     assert operation_count == (4,)
 
 
+def test_admin_preview_allows_lookups_but_blocks_reservation_mutations(
+    api: ApiHarness,
+) -> None:
+    token = _login(api.client, DEMO_ADMIN_EMAIL)
+    _create_preview_session(api.client, token)
+    interaction_id = "interaction-read-only-admin-preview"
+    reservation_date = (datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(days=2)).date()
+
+    availability = api.client.post(
+        "/v1/sarvam/tools/check-availability",
+        headers=_tool_headers(),
+        json={
+            "conversation_ref": TEST_CONVERSATION_REF,
+            "interaction_id": interaction_id,
+            "reservation_date": reservation_date.isoformat(),
+            "preferred_time": "19:00:00",
+            "party_size": 2,
+        },
+    )
+    assert availability.status_code == 200, availability.text
+    assert availability.json()["available"] is True
+    selected_start = availability.json()["slots"][0]["start_at"]
+
+    blocked = api.client.post(
+        "/v1/sarvam/tools/create-reservation",
+        headers=_tool_headers(),
+        json={
+            "conversation_ref": TEST_CONVERSATION_REF,
+            "interaction_id": interaction_id,
+            "start_at": selected_start,
+            "party_size": 2,
+        },
+    )
+
+    assert blocked.status_code == 403
+    assert blocked.json() == {
+        "detail": "State-changing tools are disabled in administrator preview sessions"
+    }
+    with sqlite3.connect(api.database_path) as connection:
+        reservation_count = connection.execute("SELECT COUNT(*) FROM cafe_reservations").fetchone()
+        mutation_operation_count = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM reservation_tool_operations
+            WHERE tool_name IN (
+                'create_reservation',
+                'reschedule_reservation',
+                'cancel_reservation'
+            )
+            """
+        ).fetchone()
+    assert reservation_count == (0,)
+    assert mutation_operation_count == (0,)
+
+
+def test_completed_admin_preview_is_excluded_from_customer_history(
+    api: ApiHarness,
+) -> None:
+    admin_token = _login(api.client, DEMO_ADMIN_EMAIL)
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    customer_path = f"/v1/customers/{DEMO_CUSTOMER_ID}"
+    before = api.client.get(customer_path, headers=headers)
+    assert before.status_code == 200
+
+    session = _create_preview_session(api.client, admin_token)
+    completion = api.client.post(
+        f"/v1/voice/sessions/{session['session_id']}/mock-complete",
+        headers=headers,
+        json={
+            "resolution": "resolved",
+            "summary": "Administrator-only preview outcome.",
+            "transcript": [
+                {"speaker": "agent", "text": "Preview complete."},
+            ],
+            "duration_seconds": 5,
+        },
+    )
+    assert completion.status_code == 200, completion.text
+
+    after = api.client.get(customer_path, headers=headers)
+    assert after.status_code == 200
+    assert after.json()["conversation_count"] == before.json()["conversation_count"]
+    assert (
+        after.json()["resolved_conversation_count"]
+        == (before.json()["resolved_conversation_count"])
+    )
+    assert after.json()["last_conversation_at"] == before.json()["last_conversation_at"]
+    assert after.json()["recent_conversations"] == before.json()["recent_conversations"]
+    assert _count(api.database_path, "conversation_outcomes") == 1
+
+
 def test_reservation_tools_reject_bad_auth_and_ambiguous_times(api: ApiHarness) -> None:
     token = _login(api.client)
     _create_session(api.client, token)
@@ -2540,7 +2957,20 @@ def test_customer_management_requires_an_explicit_admin_role(api: ApiHarness) ->
 
     responses = (
         api.client.get("/v1/customers", headers=headers),
+        api.client.post(
+            "/v1/customers",
+            headers=headers,
+            json={"full_name": "No Access", "email": "no-access@example.com"},
+        ),
         api.client.get(f"/v1/customers/{customer_id}", headers=headers),
+        api.client.post(
+            f"/v1/customers/{customer_id}/access/invitation",
+            headers=headers,
+        ),
+        api.client.post(
+            f"/v1/customers/{customer_id}/access/revoke",
+            headers=headers,
+        ),
         api.client.patch(
             f"/v1/customers/{customer_id}",
             headers=headers,
@@ -2728,6 +3158,255 @@ def test_admin_can_filter_search_and_paginate_tenant_customers(api: ApiHarness) 
     assert page.status_code == 200
     assert page.json()["total"] == 5
     assert len(page.json()["items"]) == 2
+
+
+def test_admin_onboards_invites_revokes_and_reinvites_a_customer(api: ApiHarness) -> None:
+    provider = StubInvitationProvider()
+    api.client.app.state.invitation_provider = provider
+    token = _login(api.client, DEMO_ADMIN_EMAIL)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    created = api.client.post(
+        "/v1/customers",
+        headers=headers,
+        json={
+            "full_name": "  Devika Rao  ",
+            "email": "  DEVIKA@EXAMPLE.COM  ",
+            "preferred_language": "Hindi",
+            "plan_name": "Growth",
+        },
+    )
+
+    assert created.status_code == 201, created.text
+    assert created.headers["cache-control"] == "no-store"
+    customer = created.json()
+    customer_id = customer["id"]
+    assert customer["external_ref"].startswith("CUS-")
+    assert customer["email"] == "devika@example.com"
+    assert customer["access"]["email"] == "devika@example.com"
+    assert customer["access"]["status"] == "pending"
+    assert customer["access"]["is_active"] is True
+    assert customer["access"]["invited_at"] is not None
+    assert customer["access"]["expires_at"] is not None
+    assert customer["access"]["accepted_at"] is None
+    assert {event["action"] for event in customer["recent_audit_events"]} == {
+        "customer.created",
+        "customer.access_invitation_sent",
+    }
+    assert provider.calls == [("create", "devika@example.com")]
+
+    duplicate = api.client.post(
+        "/v1/customers",
+        headers=headers,
+        json={"full_name": "Duplicate", "email": "DEVIKA@example.com"},
+    )
+    assert duplicate.status_code == 409
+    assert provider.calls == [("create", "devika@example.com")]
+
+    revoked = api.client.post(
+        f"/v1/customers/{customer_id}/access/revoke",
+        headers=headers,
+    )
+    assert revoked.status_code == 200, revoked.text
+    assert revoked.json()["access"]["status"] == "revoked"
+    assert revoked.json()["access"]["is_active"] is False
+    assert provider.calls[-1] == ("revoke", "inv_test_1")
+
+    reinvited = api.client.post(
+        f"/v1/customers/{customer_id}/access/invitation",
+        headers=headers,
+    )
+    assert reinvited.status_code == 200, reinvited.text
+    assert reinvited.json()["access"]["status"] == "pending"
+    assert reinvited.json()["access"]["is_active"] is True
+    assert provider.calls[-1] == ("create", "devika@example.com")
+    assert _query_one(
+        api.database_path,
+        "SELECT invitation_status, clerk_invitation_id, is_active FROM users WHERE customer_id = ?",
+        (customer_id,),
+    ) == ("pending", "inv_test_2", 1)
+
+
+def test_customer_creation_is_retained_and_invitation_is_queued_when_clerk_fails(
+    api: ApiHarness,
+) -> None:
+    provider = StubInvitationProvider(fail_create=True)
+    api.client.app.state.invitation_provider = provider
+    token = _login(api.client, DEMO_ADMIN_EMAIL)
+
+    created = api.client.post(
+        "/v1/customers",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "full_name": "Maya Sen",
+            "email": "maya@example.com",
+            "external_ref": "CUS-MAYA",
+        },
+    )
+
+    assert created.status_code == 201, created.text
+    assert created.headers["retry-after"] == "17"
+    assert created.json()["access"]["status"] == "queued"
+    assert created.json()["access"]["is_active"] is False
+    assert created.json()["recent_audit_events"][0]["action"] == "customer.created"
+    assert _query_one(
+        api.database_path,
+        "SELECT is_active, invitation_status, clerk_invitation_id FROM users WHERE email = ?",
+        ("maya@example.com",),
+    ) == (0, "queued", None)
+
+
+def test_revoked_queued_access_can_be_reinvited_with_a_new_generation(api: ApiHarness) -> None:
+    provider = StubInvitationProvider(fail_create=True)
+    api.client.app.state.invitation_provider = provider
+    token = _login(api.client, DEMO_ADMIN_EMAIL)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    created = api.client.post(
+        "/v1/customers",
+        headers=headers,
+        json={"full_name": "Retry User", "email": "retry-generation@example.com"},
+    )
+    assert created.status_code == 201
+    customer_id = created.json()["id"]
+    assert created.json()["access"]["status"] == "queued"
+
+    revoked = api.client.post(
+        f"/v1/customers/{customer_id}/access/revoke",
+        headers=headers,
+    )
+    assert revoked.status_code == 200
+    assert revoked.json()["access"]["status"] == "revoked"
+
+    provider.fail_create = False
+    reinvited = api.client.post(
+        f"/v1/customers/{customer_id}/access/invitation",
+        headers=headers,
+    )
+    assert reinvited.status_code == 200
+    assert reinvited.json()["access"]["status"] == "pending"
+    assert reinvited.json()["access"]["is_active"] is True
+    assert provider.calls == [
+        ("create", "retry-generation@example.com"),
+        ("create", "retry-generation@example.com"),
+    ]
+    assert _query_one(
+        api.database_path,
+        "SELECT access_generation, invitation_status, clerk_invitation_id "
+        "FROM users WHERE customer_id = ?",
+        (customer_id,),
+    ) == (3, "pending", "inv_test_1")
+
+
+def test_failed_invitation_replacement_is_durable_and_retries_safely(
+    api: ApiHarness,
+) -> None:
+    provider = StubInvitationProvider()
+    api.client.app.state.invitation_provider = provider
+    token = _login(api.client, DEMO_ADMIN_EMAIL)
+    headers = {"Authorization": f"Bearer {token}"}
+    created = api.client.post(
+        "/v1/customers",
+        headers=headers,
+        json={"full_name": "Ravi Das", "email": "ravi@example.com"},
+    )
+    assert created.status_code == 201
+    customer_id = created.json()["id"]
+
+    provider.fail_revoke = True
+    failed = api.client.post(
+        f"/v1/customers/{customer_id}/access/invitation",
+        headers=headers,
+    )
+    assert failed.status_code == 200
+    assert failed.headers["retry-after"] == "23"
+    assert failed.json()["access"]["status"] == "queued"
+    assert failed.json()["access"]["is_active"] is False
+    assert _query_one(
+        api.database_path,
+        "SELECT clerk_invitation_id FROM users WHERE customer_id = ?",
+        (customer_id,),
+    ) == ("inv_test_1",)
+
+    provider.fail_revoke = False
+    with sqlite3.connect(api.database_path) as connection:
+        connection.execute(
+            "UPDATE clerk_invitation_outbox SET available_at = ? WHERE status = 'pending'",
+            ("2000-01-01 00:00:00+00:00",),
+        )
+        connection.commit()
+    retried = api.client.post(
+        f"/v1/customers/{customer_id}/access/invitation",
+        headers=headers,
+    )
+    assert retried.status_code == 200
+    assert retried.json()["access"]["status"] == "pending"
+    assert provider.calls[-2:] == [
+        ("revoke", "inv_test_1"),
+        ("create", "ravi@example.com"),
+    ]
+
+
+def test_revocation_supersedes_an_older_queued_invitation(tmp_path: Path) -> None:
+    database_path = tmp_path / "superseded-invitation.sqlite3"
+    settings = settings_for_database(
+        database_path,
+        clerk_outbox_retry_base_seconds=1,
+        clerk_outbox_retry_max_seconds=1,
+    )
+    app = create_app(settings)
+
+    with TestClient(app) as client:
+        provider = StubInvitationProvider(fail_create=True)
+        client.app.state.invitation_provider = provider
+        token = _login(client, DEMO_ADMIN_EMAIL)
+        headers = {"Authorization": f"Bearer {token}"}
+        created = client.post(
+            "/v1/customers",
+            headers=headers,
+            json={"full_name": "Superseded User", "email": "superseded@example.com"},
+        )
+        assert created.status_code == 201
+        customer_id = created.json()["id"]
+        revoked = client.post(
+            f"/v1/customers/{customer_id}/access/revoke",
+            headers=headers,
+        )
+        assert revoked.status_code == 200
+        assert revoked.json()["access"]["status"] == "revoked"
+
+        with sqlite3.connect(database_path) as connection:
+            connection.execute(
+                "UPDATE clerk_invitation_outbox SET available_at = ? WHERE status = 'pending'",
+                ("2000-01-01 00:00:00+00:00",),
+            )
+            connection.commit()
+        provider.fail_create = False
+        first_results = asyncio.run(
+            process_ready_invitation_jobs(
+                app.state.database.session_factory,
+                provider=provider,
+                settings=settings,
+                worker_id="test-worker",
+            )
+        )
+        assert [result.state for result in first_results] == ["succeeded"]
+        second_results = asyncio.run(
+            process_ready_invitation_jobs(
+                app.state.database.session_factory,
+                provider=provider,
+                settings=settings,
+                worker_id="test-worker",
+            )
+        )
+        assert second_results == []
+
+    assert _query_one(
+        database_path,
+        "SELECT clerk_user_id, invitation_status, is_active FROM users WHERE email = ?",
+        ("superseded@example.com",),
+    ) == (None, "revoked", 0)
+    assert provider.calls == [("create", "superseded@example.com")]
 
 
 def test_customer_detail_contains_scoped_stats_orders_and_recent_conversations(
@@ -3471,14 +4150,25 @@ def test_initial_alembic_migration_creates_the_complete_fresh_schema(tmp_path: P
             row[1]: (row[2], row[3])
             for row in connection.execute("PRAGMA table_info(admin_audit_events)").fetchall()
         }
+        user_columns = {row[1] for row in connection.execute("PRAGMA table_info(users)").fetchall()}
     assert table_names == {*Base.metadata.tables, "alembic_version"}
-    assert revision == ("20260909_0003",)
+    assert revision == ("20260923_0008",)
     assert {foreign_key[2] for foreign_key in audit_foreign_keys} == {
         "customers",
         "tenants",
         "users",
     }
     assert audit_columns["actor_display_name"] == ("VARCHAR(160)", 1)
+    assert {
+        "clerk_invitation_id",
+        "invitation_status",
+        "invitation_sent_at",
+        "invitation_expires_at",
+        "invitation_accepted_at",
+        "invited_by_user_id",
+        "access_generation",
+        "clerk_last_event_at",
+    }.issubset(user_columns)
     command.check(alembic_config)
 
     settings = settings_for_database(database_path, seed_demo_data=True)

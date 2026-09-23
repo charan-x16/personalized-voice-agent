@@ -15,7 +15,7 @@ uv sync --dev
 uv run uvicorn svara_api.main:app --reload
 ```
 
-On PowerShell, use `if (-not (Test-Path .env)) { Copy-Item .env.example .env }` instead of `cp -n`. Both forms deliberately refuse to overwrite an existing `.env`: re-running the copy without `-n` replaces configured secrets such as `CLERK_SECRET_KEY` with blank template values. To restart the server later, run only the `uvicorn` line. The default configuration creates `svara.db`, seeds the customer login `rahul@example.com`, the tenant-admin login `ananya@acme.example`, and a small customer directory, then serves interactive documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
+On PowerShell, use `if (-not (Test-Path .env)) { Copy-Item .env.example .env }` instead of `cp -n`. Both forms deliberately refuse to overwrite an existing `.env`: re-running the copy without `-n` replaces configured secrets such as `CLERK_SECRET_KEY` with blank template values. To restart the server later, run only the `uvicorn` line. The default configuration creates `svara.db`, seeds the customer login `rahul@example.com`, the tenant-admin login `ananya@example.com`, and a small customer directory, then serves interactive documentation at [http://localhost:8000/docs](http://localhost:8000/docs).
 
 ## Run the wired web flow
 
@@ -42,7 +42,7 @@ Clerk components own sign-in, sign-up, recovery, and sign-out. Server components
 
 `POST /v1/auth/demo-login` remains available only when explicitly enabled with local SQLite. It is intended for direct API development and automated tests, not browser sign-in.
 
-The BFF also proxies session creation at `POST /api/voice/sessions`, cancellation at `POST /api/voice/sessions/{id}/cancel`, and, only outside production with the mock provider, completion at `POST /api/voice/sessions/{id}/mock-complete`. Mutation routes require same-origin JSON requests. The browser never receives the bearer token, `conversation_ref`, provider variables, or Sarvam credentials.
+The BFF also proxies customer session creation at `POST /api/voice/sessions`, administrator preview creation at `POST /api/customers/{customer_id}/voice-preview-sessions`, cancellation at `POST /api/voice/sessions/{id}/cancel`, and, only outside production with the mock provider, completion at `POST /api/voice/sessions/{id}/mock-complete`. Mutation routes require same-origin JSON requests. The browser never receives the bearer token, `conversation_ref`, provider variables, or Sarvam credentials.
 
 ## Try the backend API directly
 
@@ -172,15 +172,25 @@ All routes use the `/v1` prefix.
 | Method and path | Authentication | Current behavior |
 | --- | --- | --- |
 | `GET /health` | None | Executes `SELECT 1`; returns `503` when the database is unavailable |
+| `POST /webhooks/clerk` | Verified Clerk/Svix signature | Idempotently reconciles `user.created`, `user.updated`, and `user.deleted` |
 | `POST /auth/demo-login` | None | Issues a short-lived HMAC-SHA256 bearer token for one active seeded user |
 | `GET /me` | Bearer token | Returns the current user's role-aware minimal workspace profile |
 | `GET /customers` | Tenant-admin bearer token | Lists/searches tenant-scoped customers with conversation statistics |
+| `POST /customers` | Tenant-admin bearer token | Creates a customer/access user/default agent and attempts a Clerk invitation |
 | `GET /customers/{customer_id}` | Tenant-admin bearer token | Returns a scoped customer, order count, and five recent conversations |
+| `POST /customers/{customer_id}/access/invitation` | Tenant-admin bearer token | Resends an unlinked invitation or restores a linked account |
+| `POST /customers/{customer_id}/access/revoke` | Tenant-admin bearer token | Disables local access and invalidates a pending invitation when possible |
 | `PATCH /customers/{customer_id}` | Tenant-admin bearer token | Revision-checks and audits allowlisted profile/status changes; active calls block deactivation |
 | `PATCH /customers/{customer_id}/agent-configuration` | Tenant-admin bearer token | Revision-checks and audits the customer's voice-agent configuration |
+| `GET /tools` | Tenant-admin bearer token | Lists tenant-owned approved voice tools, assignment counts, and 20 recent tool audit events |
+| `POST /tools` | Tenant-admin bearer token | Registers and audits an alias for one allow-listed backend capability |
+| `PATCH /tools/{tool_id}` | Tenant-admin bearer token | Revision-safely updates or disables a tool definition and appends an audit event |
+| `GET /tools/customer-assignments/{customer_id}` | Tenant-admin bearer token | Lists the tenant catalog and this customer's assignment state |
+| `PATCH /tools/customer-assignments/{customer_id}/{tool_id}` | Tenant-admin bearer token | Revision-safely enables/disables one customer assignment and appends an audit event |
 | `GET /conversations` | Bearer token | Lists completed outcomes in the current tenant/customer scope |
 | `GET /conversations/{session_id}` | Bearer token | Returns one scoped transcript and outcome |
 | `POST /voice/sessions` | Bearer token | Derives tenant/customer and creates a provider session without exposing provider variables |
+| `POST /voice/customers/{customer_id}/preview-sessions` | Tenant-admin bearer token | Creates a tenant-scoped, administrator-attributed read-only preview for an active customer |
 | `POST /voice/sessions/{session_id}/cancel` | Bearer token | Idempotently terminates the actor's scoped provider session; retryable uncertainty keeps its active slot reserved |
 | `POST /voice/sessions/{session_id}/mock-complete` | Bearer token | Completes a mock session in development/test only |
 | `POST /sarvam/hooks/on-start` | `X-Voice-Tool-Key` | Binds the interaction and returns minimal customer context plus rendered runtime agent configuration |
@@ -190,6 +200,7 @@ All routes use the `/v1` prefix.
 | `POST /sarvam/tools/find-reservation` | `X-Voice-Tool-Key` | Finds a scoped reference or upcoming confirmed reservations |
 | `POST /sarvam/tools/reschedule-reservation` | `X-Voice-Tool-Key` | Moves a reservation using a current version and available slot |
 | `POST /sarvam/tools/cancel-reservation` | `X-Voice-Tool-Key` | Cancels a reservation using a current version and retry-safe idempotency |
+| `POST /sarvam/tools/execute/{tool_key}` | `X-Voice-Tool-Key` | Runs only an enabled tenant capability assigned to the session customer |
 | `POST /sarvam/hooks/on-end` | `X-Voice-Tool-Key` | Persists the first bounded outcome and handles matching retries idempotently |
 
 Agent opening-message templates are limited to 500 characters and may contain at most one exact `{first_name}` replacement field. The rendered runtime greeting is also limited to 500 characters; malformed legacy data or unexpectedly large customer data falls back to a generic bounded greeting.
@@ -197,8 +208,10 @@ Agent opening-message templates are limited to 500 characters and may contain at
 ## Security model
 
 - Session creation accepts an optional `language` only. Tenant and customer identifiers are resolved from the signed bearer token and revalidated against active database records.
-- Authenticated roles fail closed to two valid shapes: a `customer` must have one active customer profile, while an `admin` must not be linked to a customer. Identity display names are trimmed and must contain 1–160 characters before an Actor can be created. Administrators cannot implicitly impersonate customers or start calls.
+- Authenticated roles fail closed to two valid shapes: a `customer` must have one active customer profile, while an `admin` must not be linked to a customer. Identity display names are trimmed and must contain 1–160 characters before an Actor can be created. Administrators cannot use the normal customer voice route; they must use the explicit preview route for one active in-tenant customer.
+- Administrator previews are stored with `session_mode=admin_preview` and the initiating user ID. They are excluded from customer conversation counts and recent history. Read-only lookup tools remain available, while reservation create/reschedule/cancel operations fail with `403`; the runtime agent instructions also disclose the read-only restriction.
 - Customer-management routes require the explicit `admin` role and scope every lookup, aggregate, and update by the authenticated tenant. Foreign-tenant identifiers return the same `404` as missing records.
+- Clerk invitations are an onboarding transport, not an authorization grant. A customer can authenticate only while the local user and customer records are active and tenant-linked. Creates and revocations are committed to `clerk_invitation_outbox` before network I/O; transient failure leaves access inactive and queued for bounded retry. Revocation disables local access immediately even when Clerk is unavailable. Signed webhook message IDs are persisted for idempotency, and full webhook payloads are not retained.
 - Customer and agent-configuration writes require the revision returned by the detail API. Stale writes return `409`; successful writes increment the corresponding revision and append an audit event containing field names only, never changed values. The administrator display name is snapshotted into each event so later account renames cannot rewrite historical attribution.
 - Audit rows have database-enforced customer/tenant integrity. Actor and tenant are both derived from the same authenticated `Actor`; their relationship is application-enforced because legacy development databases do not have a composite tenant/user parent key. `actor_user_id` and `tenant_id` retain individual foreign keys.
 - SQLAlchemy hides bound parameters in engine errors and logs, preventing failed profile or agent-configuration writes from echoing customer text into operational logs.
@@ -230,7 +243,7 @@ The relay accepts raw signed 16-bit mono PCM at 16 kHz, uses the official SDK ca
 
 The active SDK registry is process-local. Run one FastAPI worker for the current deployment or add sticky routing plus shared coordination before horizontal scaling; otherwise a cancellation request handled by a different worker cannot directly stop the original in-memory SDK object.
 
-The Sarvam-facing route shapes in this service are Svara's integration contract. Configure the five cafe routes as Sarvam API tools using the reviewed field mappings in the [reservation-tool setup guide](../../docs/sarvam-v2-reservation-tools.md); the dashboard configuration itself is not stored in this repository.
+The Sarvam-facing route shapes in this service are Svara's integration contract. New deployments should configure the guarded registry endpoint using the [custom voice-tool guide](../../docs/custom-voice-tools.md), with reservation arguments from the reviewed [reservation-tool setup guide](../../docs/sarvam-v2-reservation-tools.md). The legacy capability-specific routes remain compatible. Sarvam dashboard configuration itself is not stored in this repository.
 
 ## Database
 
@@ -277,7 +290,7 @@ The seed contains one Acme tenant, five customers, two application users, three
 orders, per-customer agent configuration, a `By the Brew` reservation policy,
 six cafe tables, and three completed conversations.
 It never creates Clerk identities. In a Clerk development instance, sign up as
-`ananya+clerk_test@acme.example` or `rahul+clerk_test@example.com` and use the
+`ananya+clerk_test@example.com` or `rahul+clerk_test@example.com` and use the
 test verification code `424242`; non-production alias handling links those
 identities to the corresponding seeded application users on first access.
 
@@ -292,6 +305,14 @@ docker run --rm --env-file .env svara-api alembic upgrade head
 ```
 
 The supplied API Dockerfile runs Uvicorn as the unprivileged `svara` user.
+
+Run the durable Clerk job processor as a separate service from the same image. `--watch` polls continuously; without it the command processes one ready batch and exits:
+
+```bash
+uv run python scripts/process_invitation_outbox.py --watch
+```
+
+The API makes one immediate best-effort attempt after committing each job, so local development does not require the worker when Clerk is healthy. Production must run the worker and monitor `pending` and `dead_letter` rows.
 
 ## Configuration
 
@@ -314,6 +335,13 @@ The supplied API Dockerfile runs Uvicorn as the unprivileged `svara` user.
 | `SEED_DEMO_DATA` | Seeds the local tenant/customer/order |
 | `CLERK_SECRET_KEY` | Server-only Clerk key used for token verification and first-access identity linking |
 | `CLERK_JWT_KEY` | Optional public key for networkless Clerk JWT signature verification |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | Server-only `whsec_...` secret for `/v1/webhooks/clerk`; required in production |
+| `CLERK_INVITATION_REDIRECT_URL` | Optional allowlisted frontend `/sign-up` URL used in customer invitations |
+| `CLERK_INVITATION_EXPIRY_DAYS` | Invitation validity in days, from 1 to 365; defaults to 30 |
+| `CLERK_OUTBOX_MAX_ATTEMPTS` | Attempts before an invitation job becomes `dead_letter`; defaults to 8 |
+| `CLERK_OUTBOX_RETRY_BASE_SECONDS` | Initial durable retry delay; defaults to 30 seconds |
+| `CLERK_OUTBOX_RETRY_MAX_SECONDS` | Maximum provider-directed or exponential delay; defaults to 3,600 seconds |
+| `CLERK_OUTBOX_CLAIM_TIMEOUT_SECONDS` | Age after which an interrupted `processing` claim can be recovered; defaults to 300 seconds |
 | `SARVAM_API_KEY`, `SARVAM_ORG_ID`, `SARVAM_WORKSPACE_ID`, `SARVAM_AGENT_ID` | Server-only Sarvam SDK credentials and identifiers |
 | `SARVAM_AGENT_VERSION` | Committed Sarvam agent version pinned for runtime sessions |
 | `VOICE_WEBSOCKET_PUBLIC_URL` | Public Svara relay URL; loopback `ws:` locally and `wss:` remotely |

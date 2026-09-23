@@ -1,0 +1,157 @@
+.form {
+  overflow: hidden;
+  background: rgba(251, 250, 247, 0.78);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.formHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 26px 21px;
+  border-bottom: 1px solid var(--line);
+}
+
+.formHeading h2 {
+  margin: 7px 0 0;
+  font-family: var(--font-serif);
+  font-size: 1.75rem;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+}
+
+.formHeading > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--sage);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px 18px;
+  padding: 27px 26px 30px;
+}
+
+.fields label {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.fields label > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fields em {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.fields input,
+.fields select {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 15px;
+  background: var(--paper-strong);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 500;
+  outline: 0;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.fields input:focus,
+.fields select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(223, 95, 63, 0.1);
+}
+
+.fields small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 480;
+  line-height: 1.45;
+}
+
+.fullField {
+  grid-column: 1 / -1;
+}
+
+.error {
+  margin: 0 26px 22px;
+  padding: 12px 14px;
+  background: rgba(180, 55, 37, 0.07);
+  border: 1px solid rgba(180, 55, 37, 0.18);
+  border-radius: 11px;
+  color: #8f2e20;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.formFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 18px 26px;
+  background: rgba(236, 231, 220, 0.45);
+  border-top: 1px solid var(--line);
+}
+
+.formFooter p {
+  max-width: 620px;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.formFooter button {
+  flex: 0 0 auto;
+}
+
+.spinner {
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 700px) {
+  .formHeading,
+  .formFooter {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .fields {
+    grid-template-columns: 1fr;
+  }
+
+  .fullField {
+    grid-column: auto;
+  }
+
+  .formFooter button {
+    width: 100%;
+  }
+}

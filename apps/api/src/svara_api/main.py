@@ -9,6 +9,7 @@ from .config import Settings, get_settings
 from .database import Database
 from .middleware import RequestBodyLimitMiddleware
 from .seed import seed_demo_data
+from .services.clerk_invitations import build_invitation_provider
 from .services.voice_provider import build_voice_provider
 
 
@@ -16,6 +17,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application_settings = settings or get_settings()
     database = Database(application_settings)
     voice_provider = build_voice_provider(application_settings)
+    invitation_provider = build_invitation_provider(application_settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -49,6 +51,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = application_settings
     app.state.database = database
     app.state.voice_provider = voice_provider
+    app.state.invitation_provider = invitation_provider
 
     app.add_middleware(
         RequestBodyLimitMiddleware,

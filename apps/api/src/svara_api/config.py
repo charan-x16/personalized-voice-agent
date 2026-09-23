@@ -58,6 +58,13 @@ class Settings(BaseSettings):
 
     clerk_secret_key: str | None = Field(default=None, repr=False)
     clerk_jwt_key: str | None = Field(default=None, repr=False)
+    clerk_webhook_signing_secret: str | None = Field(default=None, repr=False)
+    clerk_invitation_redirect_url: str | None = None
+    clerk_invitation_expiry_days: int = Field(default=30, ge=1, le=365)
+    clerk_outbox_max_attempts: int = Field(default=8, ge=1, le=50)
+    clerk_outbox_retry_base_seconds: int = Field(default=30, ge=1, le=3_600)
+    clerk_outbox_retry_max_seconds: int = Field(default=3_600, ge=1, le=86_400)
+    clerk_outbox_claim_timeout_seconds: int = Field(default=300, ge=30, le=3_600)
 
     @field_validator(
         "database_ca_cert_file",
@@ -70,6 +77,8 @@ class Settings(BaseSettings):
         "sarvam_agent_version",
         "clerk_secret_key",
         "clerk_jwt_key",
+        "clerk_webhook_signing_secret",
+        "clerk_invitation_redirect_url",
         mode="before",
     )
     @classmethod
@@ -88,6 +97,13 @@ class Settings(BaseSettings):
         return frozenset(
             key.strip() for key in self.final_variable_allowlist.split(",") if key.strip()
         )
+
+    @property
+    def resolved_clerk_invitation_redirect_url(self) -> str:
+        if self.clerk_invitation_redirect_url:
+            return self.clerk_invitation_redirect_url
+        origin = self.cors_origins[0] if self.cors_origins else "http://localhost:3000"
+        return f"{origin.rstrip('/')}/sign-up"
 
     @property
     def resolved_database_url(self) -> str:
@@ -119,6 +135,9 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def protect_production_defaults(self) -> "Settings":
+        if self.clerk_outbox_retry_max_seconds < self.clerk_outbox_retry_base_seconds:
+            raise ValueError("CLERK_OUTBOX_RETRY_MAX_SECONDS must be at least the retry base")
+
         websocket_url = urlsplit(self.voice_websocket_public_url)
         websocket_is_loopback = websocket_url.hostname in {
             "localhost",
@@ -135,6 +154,28 @@ class Settings(BaseSettings):
             or (websocket_url.scheme == "ws" and not websocket_is_loopback)
         ):
             raise ValueError("VOICE_WEBSOCKET_PUBLIC_URL must be WSS, or WS on a loopback host")
+
+        invitation_url = urlsplit(self.resolved_clerk_invitation_redirect_url)
+        invitation_origin = f"{invitation_url.scheme}://{invitation_url.netloc}"
+        invitation_is_loopback = invitation_url.hostname in {"localhost", "127.0.0.1", "::1"}
+        if (
+            invitation_url.scheme not in {"http", "https"}
+            or invitation_url.hostname is None
+            or invitation_url.username is not None
+            or invitation_url.password is not None
+            or invitation_url.query
+            or invitation_url.fragment
+            or (
+                self.app_env == "production"
+                and invitation_url.scheme == "http"
+                and not invitation_is_loopback
+            )
+            or invitation_origin not in self.cors_origins
+        ):
+            raise ValueError(
+                "CLERK_INVITATION_REDIRECT_URL must use an allowed frontend origin and HTTPS, "
+                "or HTTP on loopback"
+            )
 
         if self.app_env != "production":
             if not self.database_url.startswith("sqlite+aiosqlite://") and (
@@ -169,7 +210,7 @@ class Settings(BaseSettings):
             )
         ):
             raise ValueError("Production Sarvam configuration is incomplete")
-        if not self.clerk_secret_key:
+        if not self.clerk_secret_key or not self.clerk_webhook_signing_secret:
             raise ValueError("Production Clerk authentication configuration is incomplete")
         if websocket_url.scheme != "wss":
             raise ValueError("Production voice relay URL must use WSS")

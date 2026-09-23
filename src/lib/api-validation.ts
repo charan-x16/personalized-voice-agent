@@ -9,6 +9,10 @@ import type {
   ConversationSummary,
   CustomerAuditAction,
   CustomerAuditEvent,
+  CustomerAccess,
+  CustomerAccessAuditField,
+  CustomerAccessStatus,
+  CustomerCreateRequest,
   CustomerDetail,
   CustomerListQuery,
   CustomerListResponse,
@@ -20,6 +24,16 @@ import type {
   TranscriptTurn,
   VoiceSessionResponse,
   VoiceSessionCancelStatus,
+  CustomerVoiceTool,
+  CustomerVoiceToolListResponse,
+  CustomerVoiceToolUpdateRequest,
+  VoiceToolAdminAction,
+  VoiceToolAdminEvent,
+  VoiceToolCapability,
+  VoiceToolCreateRequest,
+  VoiceToolDefinition,
+  VoiceToolListResponse,
+  VoiceToolUpdateRequest,
 } from "@/lib/api-types";
 
 type UnknownRecord = Record<string, unknown>;
@@ -87,10 +101,37 @@ const PROFILE_AUDIT_FIELDS: ReadonlySet<CustomerProfileAuditField> = new Set([
 ]);
 const AGENT_CONFIGURATION_AUDIT_FIELDS: ReadonlySet<AgentConfigurationAuditField> =
   new Set(["display_name", "opening_message", "tone", "instructions"]);
+const ACCESS_AUDIT_FIELDS: ReadonlySet<CustomerAccessAuditField> = new Set([
+  "access_status",
+]);
 const CUSTOMER_AUDIT_ACTIONS: ReadonlySet<CustomerAuditAction> = new Set([
   "customer.profile_updated",
   "customer.agent_configuration_updated",
+  "customer.created",
+  "customer.access_invitation_sent",
+  "customer.access_invitation_failed",
+  "customer.access_revoked",
+  "customer.access_restored",
 ]);
+const CUSTOMER_ACCESS_STATUSES: ReadonlySet<CustomerAccessStatus> = new Set([
+  "not_invited",
+  "queued",
+  "pending",
+  "accepted",
+  "revoked",
+  "expired",
+  "failed",
+]);
+const VOICE_TOOL_CAPABILITIES: ReadonlySet<VoiceToolCapability> = new Set([
+  "customer_profile",
+  "order_status",
+  "reservation_availability",
+  "reservation_lookup",
+  "reservation_create",
+  "reservation_reschedule",
+  "reservation_cancel",
+]);
+const SAFE_TOOL_KEY = /^[a-z][a-z0-9_]{2,79}$/;
 
 const FIRST_NAME_TEMPLATE_FIELD = "{first_name}";
 export const MAX_RUNTIME_OPENING_MESSAGE_LENGTH = 500;
@@ -350,6 +391,234 @@ export function parseCustomerListResponse(value: unknown): CustomerListResponse 
   };
 }
 
+function parseVoiceToolDefinition(value: unknown): VoiceToolDefinition | null {
+  const payload = asRecord(value);
+  if (!payload || Object.keys(payload).length !== 10) return null;
+  const id = trimmedString(payload.id, 1, 64);
+  const toolKey = trimmedString(payload.tool_key, 3, 80);
+  const displayName = trimmedString(payload.display_name, 1, 80);
+  const description = trimmedString(payload.description, 1, 500);
+  if (
+    !id ||
+    !SAFE_CUSTOMER_ID.test(id) ||
+    !toolKey ||
+    !SAFE_TOOL_KEY.test(toolKey) ||
+    !displayName ||
+    !description ||
+    typeof payload.capability !== "string" ||
+    !VOICE_TOOL_CAPABILITIES.has(payload.capability as VoiceToolCapability) ||
+    typeof payload.is_enabled !== "boolean" ||
+    !positiveInteger(payload.revision) ||
+    !nonNegativeInteger(payload.assigned_customer_count) ||
+    !validTimestamp(payload.created_at) ||
+    !validTimestamp(payload.updated_at)
+  ) {
+    return null;
+  }
+  return {
+    id,
+    tool_key: toolKey,
+    display_name: displayName,
+    description,
+    capability: payload.capability as VoiceToolCapability,
+    is_enabled: payload.is_enabled,
+    revision: payload.revision,
+    assigned_customer_count: payload.assigned_customer_count,
+    created_at: payload.created_at,
+    updated_at: payload.updated_at,
+  };
+}
+
+export function parseVoiceToolListResponse(value: unknown): VoiceToolListResponse | null {
+  const payload = asRecord(value);
+  if (
+    !payload ||
+    Object.keys(payload).length !== 3 ||
+    !Array.isArray(payload.items) ||
+    !Array.isArray(payload.recent_events) ||
+    payload.recent_events.length > 20
+  ) {
+    return null;
+  }
+  if (!nonNegativeInteger(payload.total) || payload.items.length !== payload.total) return null;
+  const items = payload.items.map(parseVoiceToolDefinition);
+  const recentEvents = payload.recent_events.map(parseVoiceToolAdminEvent);
+  if (items.some((item) => item === null) || recentEvents.some((event) => event === null)) {
+    return null;
+  }
+  return {
+    items: items as VoiceToolDefinition[],
+    total: payload.total,
+    recent_events: recentEvents as VoiceToolAdminEvent[],
+  };
+}
+
+const VOICE_TOOL_ADMIN_ACTIONS: ReadonlySet<VoiceToolAdminAction> = new Set([
+  "voice_tool.created",
+  "voice_tool.updated",
+  "customer_voice_tool.updated",
+]);
+
+function parseVoiceToolAdminEvent(value: unknown): VoiceToolAdminEvent | null {
+  const payload = asRecord(value);
+  if (!payload || Object.keys(payload).length !== 11) return null;
+  const id = trimmedString(payload.id, 1, 64);
+  const toolId = trimmedString(payload.tool_id, 1, 64);
+  const toolKey = trimmedString(payload.tool_key, 3, 80);
+  const toolDisplayName = trimmedString(payload.tool_display_name, 1, 80);
+  const actorDisplayName = trimmedString(payload.actor_display_name, 1, 160);
+  const customerId =
+    payload.customer_id === null ? null : trimmedString(payload.customer_id, 1, 64);
+  const customerReference =
+    payload.customer_reference === null
+      ? null
+      : trimmedString(payload.customer_reference, 1, 120);
+  const action = payload.action as VoiceToolAdminAction;
+  if (
+    !id ||
+    !SAFE_CUSTOMER_ID.test(id) ||
+    !toolId ||
+    !SAFE_CUSTOMER_ID.test(toolId) ||
+    !toolKey ||
+    !SAFE_TOOL_KEY.test(toolKey) ||
+    !toolDisplayName ||
+    !actorDisplayName ||
+    !VOICE_TOOL_ADMIN_ACTIONS.has(action) ||
+    !Array.isArray(payload.changed_fields) ||
+    payload.changed_fields.length > 10 ||
+    payload.changed_fields.some(
+      (field) => typeof field !== "string" || field.length < 1 || field.length > 80,
+    ) ||
+    !positiveInteger(payload.revision) ||
+    !validTimestamp(payload.created_at) ||
+    (customerId !== null && !SAFE_CUSTOMER_ID.test(customerId)) ||
+    ((customerId === null) !== (customerReference === null)) ||
+    (action === "customer_voice_tool.updated" && customerId === null) ||
+    (action !== "customer_voice_tool.updated" && customerId !== null)
+  ) {
+    return null;
+  }
+  return {
+    id,
+    action,
+    tool_id: toolId,
+    tool_key: toolKey,
+    tool_display_name: toolDisplayName,
+    customer_id: customerId,
+    customer_reference: customerReference,
+    changed_fields: payload.changed_fields as string[],
+    revision: payload.revision,
+    actor_display_name: actorDisplayName,
+    created_at: payload.created_at,
+  };
+}
+
+export function parseVoiceToolDefinitionResponse(value: unknown): VoiceToolDefinition | null {
+  return parseVoiceToolDefinition(value);
+}
+
+function parseCustomerVoiceTool(value: unknown): CustomerVoiceTool | null {
+  const payload = asRecord(value);
+  if (!payload || Object.keys(payload).length !== 5) return null;
+  const tool = parseVoiceToolDefinition(payload.tool);
+  if (
+    !tool ||
+    typeof payload.assigned !== "boolean" ||
+    typeof payload.is_enabled !== "boolean" ||
+    !(payload.revision === null || positiveInteger(payload.revision)) ||
+    !(payload.updated_at === null || validTimestamp(payload.updated_at)) ||
+    (payload.assigned !== (payload.revision !== null)) ||
+    (!payload.assigned && payload.is_enabled)
+  ) {
+    return null;
+  }
+  return {
+    tool,
+    assigned: payload.assigned,
+    is_enabled: payload.is_enabled,
+    revision: payload.revision,
+    updated_at: payload.updated_at,
+  };
+}
+
+export function parseCustomerVoiceToolResponse(value: unknown): CustomerVoiceTool | null {
+  return parseCustomerVoiceTool(value);
+}
+
+export function parseCustomerVoiceToolListResponse(
+  value: unknown,
+): CustomerVoiceToolListResponse | null {
+  const payload = asRecord(value);
+  if (!payload || Object.keys(payload).length !== 2 || !Array.isArray(payload.items)) return null;
+  const customerId = trimmedString(payload.customer_id, 1, 64);
+  if (!customerId || !SAFE_CUSTOMER_ID.test(customerId)) return null;
+  const items = payload.items.map(parseCustomerVoiceTool);
+  if (items.some((item) => item === null)) return null;
+  return { customer_id: customerId, items: items as CustomerVoiceTool[] };
+}
+
+export function parseVoiceToolCreatePayload(value: unknown): VoiceToolCreateRequest | null {
+  const payload = asRecord(value);
+  if (!payload || ![4, 5].includes(Object.keys(payload).length)) return null;
+  const allowed = new Set(["tool_key", "display_name", "description", "capability", "is_enabled"]);
+  if (Object.keys(payload).some((key) => !allowed.has(key))) return null;
+  const toolKey = trimmedString(payload.tool_key, 3, 80);
+  const displayName = trimmedString(payload.display_name, 1, 80);
+  const description = trimmedString(payload.description, 1, 500);
+  if (
+    !toolKey ||
+    !SAFE_TOOL_KEY.test(toolKey) ||
+    !displayName ||
+    !description ||
+    typeof payload.capability !== "string" ||
+    !VOICE_TOOL_CAPABILITIES.has(payload.capability as VoiceToolCapability) ||
+    !(payload.is_enabled === undefined || typeof payload.is_enabled === "boolean")
+  ) return null;
+  return {
+    tool_key: toolKey,
+    display_name: displayName,
+    description,
+    capability: payload.capability as VoiceToolCapability,
+    is_enabled: payload.is_enabled ?? true,
+  };
+}
+
+export function parseVoiceToolUpdatePayload(value: unknown): VoiceToolUpdateRequest | null {
+  const payload = asRecord(value);
+  if (!payload || Object.keys(payload).length < 2 || Object.keys(payload).length > 4) return null;
+  const allowed = new Set(["expected_revision", "display_name", "description", "is_enabled"]);
+  if (Object.keys(payload).some((key) => !allowed.has(key)) || !positiveInteger(payload.expected_revision)) return null;
+  const result: VoiceToolUpdateRequest = { expected_revision: payload.expected_revision };
+  if ("display_name" in payload) {
+    const value = trimmedString(payload.display_name, 1, 80);
+    if (!value) return null;
+    result.display_name = value;
+  }
+  if ("description" in payload) {
+    const value = trimmedString(payload.description, 1, 500);
+    if (!value) return null;
+    result.description = value;
+  }
+  if ("is_enabled" in payload) {
+    if (typeof payload.is_enabled !== "boolean") return null;
+    result.is_enabled = payload.is_enabled;
+  }
+  return result;
+}
+
+export function parseCustomerVoiceToolUpdatePayload(
+  value: unknown,
+): CustomerVoiceToolUpdateRequest | null {
+  const payload = asRecord(value);
+  if (!payload || Object.keys(payload).length !== 2) return null;
+  if (typeof payload.is_enabled !== "boolean") return null;
+  if (!(payload.expected_revision === null || positiveInteger(payload.expected_revision))) return null;
+  return {
+    is_enabled: payload.is_enabled,
+    expected_revision: payload.expected_revision,
+  };
+}
+
 function parseAgentConfiguration(value: unknown): AgentConfiguration | null {
   const item = asRecord(value);
   if (!item) return null;
@@ -380,6 +649,30 @@ function parseAgentConfiguration(value: unknown): AgentConfiguration | null {
   };
 }
 
+function parseCustomerAccess(value: unknown): CustomerAccess | null {
+  const item = asRecord(value);
+  if (!item) return null;
+  const email = trimmedString(item.email, 3, 254);
+  if (
+    !email ||
+    !CUSTOMER_ACCESS_STATUSES.has(item.status as CustomerAccessStatus) ||
+    typeof item.is_active !== "boolean" ||
+    (item.invited_at !== null && !validTimestamp(item.invited_at)) ||
+    (item.expires_at !== null && !validTimestamp(item.expires_at)) ||
+    (item.accepted_at !== null && !validTimestamp(item.accepted_at))
+  ) {
+    return null;
+  }
+  return {
+    email,
+    status: item.status as CustomerAccessStatus,
+    is_active: item.is_active,
+    invited_at: item.invited_at,
+    expires_at: item.expires_at,
+    accepted_at: item.accepted_at,
+  };
+}
+
 function parseCustomerAuditEvent(value: unknown): CustomerAuditEvent | null {
   const item = asRecord(value);
   if (!item) return null;
@@ -401,24 +694,25 @@ function parseCustomerAuditEvent(value: unknown): CustomerAuditEvent | null {
   }
 
   const changedFields = item.changed_fields.filter(
-    (field): field is CustomerProfileAuditField | AgentConfigurationAuditField =>
+    (field): field is
+      | CustomerProfileAuditField
+      | AgentConfigurationAuditField
+      | CustomerAccessAuditField =>
       typeof field === "string" &&
       (PROFILE_AUDIT_FIELDS.has(field as CustomerProfileAuditField) ||
-        AGENT_CONFIGURATION_AUDIT_FIELDS.has(field as AgentConfigurationAuditField)),
+        AGENT_CONFIGURATION_AUDIT_FIELDS.has(field as AgentConfigurationAuditField) ||
+        ACCESS_AUDIT_FIELDS.has(field as CustomerAccessAuditField)),
   );
+  const allowedFields: ReadonlySet<string> =
+    item.action === "customer.profile_updated" || item.action === "customer.created"
+      ? PROFILE_AUDIT_FIELDS
+      : item.action === "customer.agent_configuration_updated"
+        ? AGENT_CONFIGURATION_AUDIT_FIELDS
+        : ACCESS_AUDIT_FIELDS;
   if (
     changedFields.length !== item.changed_fields.length ||
     new Set(changedFields).size !== changedFields.length ||
-    (item.action === "customer.profile_updated"
-      ? changedFields.some(
-          (field) => !PROFILE_AUDIT_FIELDS.has(field as CustomerProfileAuditField),
-        )
-      : changedFields.some(
-          (field) =>
-            !AGENT_CONFIGURATION_AUDIT_FIELDS.has(
-              field as AgentConfigurationAuditField,
-            ),
-        ))
+    changedFields.some((field) => !allowedFields.has(field))
   ) {
     return null;
   }
@@ -453,6 +747,8 @@ export function parseCustomerDetail(value: unknown): CustomerDetail | null {
 
   const email = payload.email === null ? null : trimmedString(payload.email, 3, 254);
   if (payload.email !== null && !email) return null;
+  const access = payload.access === null ? null : parseCustomerAccess(payload.access);
+  if (payload.access !== null && !access) return null;
 
   const recentConversations = payload.recent_conversations.map(parseConversationSummary);
   const recentAuditEvents = payload.recent_audit_events.map(parseCustomerAuditEvent);
@@ -466,11 +762,58 @@ export function parseCustomerDetail(value: unknown): CustomerDetail | null {
   return {
     ...summary,
     email,
+    access,
     open_order_count: payload.open_order_count,
     profile_revision: payload.profile_revision,
     agent_configuration: agentConfiguration,
     recent_audit_events: recentAuditEvents as CustomerAuditEvent[],
     recent_conversations: recentConversations as ConversationSummary[],
+  };
+}
+
+const CUSTOMER_CREATE_KEYS = new Set([
+  "full_name",
+  "email",
+  "external_ref",
+  "preferred_language",
+  "plan_name",
+]);
+const CUSTOMER_EMAIL = /^[^@\s]{1,64}@[^@\s]{1,189}$/;
+
+export function parseCustomerCreatePayload(value: unknown): CustomerCreateRequest | null {
+  const payload = asRecord(value);
+  if (!payload || Object.keys(payload).some((key) => !CUSTOMER_CREATE_KEYS.has(key))) {
+    return null;
+  }
+
+  const fullName = trimmedString(payload.full_name, 1, 160);
+  const email = trimmedString(payload.email, 3, 254)?.toLowerCase() ?? null;
+  const externalRef = Object.hasOwn(payload, "external_ref")
+    ? trimmedString(payload.external_ref, 1, 120)
+    : undefined;
+  const preferredLanguage = Object.hasOwn(payload, "preferred_language")
+    ? trimmedString(payload.preferred_language, 2, 40)
+    : "English";
+  const planName = Object.hasOwn(payload, "plan_name")
+    ? trimmedString(payload.plan_name, 1, 80)
+    : "Essential";
+  if (
+    !fullName ||
+    !email ||
+    !CUSTOMER_EMAIL.test(email) ||
+    (Object.hasOwn(payload, "external_ref") && !externalRef) ||
+    !preferredLanguage ||
+    !planName
+  ) {
+    return null;
+  }
+
+  return {
+    full_name: fullName,
+    email,
+    ...(externalRef ? { external_ref: externalRef } : {}),
+    preferred_language: preferredLanguage,
+    plan_name: planName,
   };
 }
 

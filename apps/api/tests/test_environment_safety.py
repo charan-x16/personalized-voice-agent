@@ -169,4 +169,5 @@ def test_production_requires_a_secure_public_voice_relay() -> None:
             sarvam_agent_id="sarvam-agent",
             sarvam_agent_version=2,
             clerk_secret_key="sk_test_valid-looking-test-key",
+            clerk_webhook_signing_secret="whsec_test-signing-secret",
         )

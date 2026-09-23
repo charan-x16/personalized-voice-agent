@@ -47,6 +47,11 @@ _MAX_FINAL_VARIABLE_ITEMS = 1_000
 _MAX_FINAL_VARIABLE_DEPTH = 6
 _MAX_FINAL_VARIABLE_STRING_CHARACTERS = 4_000
 _MAX_FINAL_VARIABLE_KEY_CHARACTERS = 128
+_ADMIN_PREVIEW_RUNTIME_INSTRUCTION = (
+    "Administrator preview mode is active. You may retrieve information, but you must not "
+    "create, reschedule, cancel, or otherwise modify customer or business data. Clearly say "
+    "that write actions are unavailable in this preview."
+)
 
 
 def _utc_datetime(value: datetime) -> datetime:
@@ -79,6 +84,14 @@ def _ensure_session_is_usable(voice_session: VoiceSession) -> None:
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
             detail="Voice session has expired",
+        )
+
+
+def _ensure_session_allows_mutation(voice_session: VoiceSession) -> None:
+    if voice_session.session_mode == "admin_preview":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="State-changing tools are disabled in administrator preview sessions",
         )
 
 
@@ -304,6 +317,11 @@ async def on_start(
         )
     )
     agent_configuration = resolve_agent_configuration(stored_agent_configuration)
+    runtime_instructions = agent_configuration.instructions
+    if voice_session.session_mode == "admin_preview":
+        runtime_instructions = (
+            f"{runtime_instructions}\n\n{_ADMIN_PREVIEW_RUNTIME_INSTRUCTION}"
+        ).strip()
     response = OnStartResponse(
         session_id=voice_session.id,
         customer=CustomerContext(
@@ -319,7 +337,7 @@ async def on_start(
                 first_name=first_name,
             ),
             tone=agent_configuration.tone,
-            instructions=agent_configuration.instructions,
+            instructions=runtime_instructions,
             revision=agent_configuration.revision,
         ),
         safe_to_continue=True,

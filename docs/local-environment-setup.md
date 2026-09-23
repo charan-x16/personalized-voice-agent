@@ -38,6 +38,8 @@ VOICE_PROVIDER=sarvam
 CLERK_SECRET_KEY=your-clerk-secret-key
 # Optional: networkless Clerk JWT signature verification.
 CLERK_JWT_KEY=
+# Clerk Dashboard -> Webhooks -> endpoint signing secret.
+CLERK_WEBHOOK_SIGNING_SECRET=whsec_your-signing-secret
 ```
 
 `verify-full` enables certificate-chain and hostname verification for both the
@@ -78,6 +80,8 @@ already-linked matches fail closed. In non-production only, Clerk test aliases
 such as `rahul+clerk_test@example.com` may link to the seeded
 `rahul@example.com` row; use verification code `424242` in Clerk test mode.
 
+For local webhook testing, expose port 8000 with a trusted tunnel, configure the exact public URL ending in `/v1/webhooks/clerk` in Clerk Dashboard, and subscribe to `user.created`, `user.updated`, and `user.deleted`. Never disable signature verification for local testing. In production, use the final HTTPS API hostname with no redirect in front of the webhook path.
+
 Use different, randomly generated values of at least 32 characters for
 `SESSION_SECRET` and `SARVAM_TOOL_SECRET`. Rotating the session secret invalidates
 previously issued application sessions; rotating the tool secret requires
@@ -92,12 +96,25 @@ SARVAM_WORKSPACE_ID=your-workspace-id
 SARVAM_AGENT_ID=your-agent-id
 SARVAM_AGENT_VERSION=2
 VOICE_WEBSOCKET_PUBLIC_URL=ws://127.0.0.1:8000/v1/voice/stream
+CLERK_INVITATION_REDIRECT_URL=http://localhost:3000/sign-up
+CLERK_INVITATION_EXPIRY_DAYS=30
+CLERK_OUTBOX_MAX_ATTEMPTS=8
+CLERK_OUTBOX_RETRY_BASE_SECONDS=30
+CLERK_OUTBOX_RETRY_MAX_SECONDS=3600
+CLERK_OUTBOX_CLAIM_TIMEOUT_SECONDS=300
 ```
 
 The version must be committed in Sarvam. Use the latest deliberate committed version, not a draft.
 The local relay uses `ws:` only on loopback; staging and production require a public `wss:` URL.
 The base `sarvam-conv-ai-sdk` dependency is sufficient because browser audio is proxied as PCM and
 the API server does not open local audio hardware.
+
+When testing retries or running a shared environment, start the invitation worker in a third terminal:
+
+```bash
+cd apps/api
+uv run python scripts/process_invitation_outbox.py --watch
+```
 
 ## What these settings do not enable
 

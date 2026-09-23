@@ -38,6 +38,22 @@
   line-height: 1;
 }
 
+.returnLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 9px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.returnLink:hover {
+  color: var(--ink);
+  transform: translateX(-2px);
+}
+
 .sessionMeta {
   display: flex;
   align-items: center;
@@ -48,6 +64,7 @@
 }
 
 .secureBadge,
+.previewBadge,
 .timer {
   display: inline-flex;
   height: 34px;
@@ -57,6 +74,12 @@
   background: rgba(251, 250, 247, 0.68);
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
+}
+
+.previewBadge {
+  color: #345948;
+  background: #e9f0ea;
+  border-color: rgba(52, 89, 72, 0.16);
 }
 
 .secureBadge svg {
@@ -91,6 +114,37 @@
   justify-content: center;
   padding: clamp(38px, 5vw, 72px);
   text-align: center;
+}
+
+.previewNotice {
+  display: flex;
+  width: min(100%, 560px);
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 auto 34px;
+  padding: 13px 15px;
+  color: #345948;
+  background: #eef3ed;
+  border: 1px solid rgba(52, 89, 72, 0.14);
+  border-radius: 14px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  text-align: left;
+}
+
+.previewNotice svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.previewNotice span {
+  display: grid;
+  gap: 2px;
+}
+
+.previewNotice strong {
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .statusCopy {
@@ -828,6 +882,11 @@
     margin-bottom: 20px;
   }
 
+  .sessionMeta {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
   .topbar h1 {
     font-size: 2rem;
   }
@@ -844,6 +903,10 @@
   .callPanel {
     min-height: 0;
     padding: 28px 19px 24px;
+  }
+
+  .previewNotice {
+    margin-bottom: 26px;
   }
 
   .statusCopy h2 {

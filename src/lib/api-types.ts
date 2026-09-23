@@ -58,6 +58,86 @@ export type CustomerListResponse = {
   total: number;
 };
 
+export type VoiceToolCapability =
+  | "customer_profile"
+  | "order_status"
+  | "reservation_availability"
+  | "reservation_lookup"
+  | "reservation_create"
+  | "reservation_reschedule"
+  | "reservation_cancel";
+
+export type VoiceToolDefinition = {
+  id: string;
+  tool_key: string;
+  display_name: string;
+  description: string;
+  capability: VoiceToolCapability;
+  is_enabled: boolean;
+  revision: number;
+  assigned_customer_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type VoiceToolAdminAction =
+  | "voice_tool.created"
+  | "voice_tool.updated"
+  | "customer_voice_tool.updated";
+
+export type VoiceToolAdminEvent = {
+  id: string;
+  action: VoiceToolAdminAction;
+  tool_id: string;
+  tool_key: string;
+  tool_display_name: string;
+  customer_id: string | null;
+  customer_reference: string | null;
+  changed_fields: string[];
+  revision: number;
+  actor_display_name: string;
+  created_at: string;
+};
+
+export type VoiceToolListResponse = {
+  items: VoiceToolDefinition[];
+  total: number;
+  recent_events: VoiceToolAdminEvent[];
+};
+
+export type VoiceToolCreateRequest = {
+  tool_key: string;
+  display_name: string;
+  description: string;
+  capability: VoiceToolCapability;
+  is_enabled: boolean;
+};
+
+export type VoiceToolUpdateRequest = {
+  expected_revision: number;
+  display_name?: string;
+  description?: string;
+  is_enabled?: boolean;
+};
+
+export type CustomerVoiceTool = {
+  tool: VoiceToolDefinition;
+  assigned: boolean;
+  is_enabled: boolean;
+  revision: number | null;
+  updated_at: string | null;
+};
+
+export type CustomerVoiceToolListResponse = {
+  customer_id: string;
+  items: CustomerVoiceTool[];
+};
+
+export type CustomerVoiceToolUpdateRequest = {
+  is_enabled: boolean;
+  expected_revision: number | null;
+};
+
 export type AgentTone = "warm" | "professional" | "concise";
 
 export type AgentConfiguration = {
@@ -81,14 +161,23 @@ export type AgentConfigurationAuditField =
   | "tone"
   | "instructions";
 
+export type CustomerAccessAuditField = "access_status";
+
 export type CustomerAuditAction =
   | "customer.profile_updated"
-  | "customer.agent_configuration_updated";
+  | "customer.agent_configuration_updated"
+  | "customer.created"
+  | "customer.access_invitation_sent"
+  | "customer.access_invitation_failed"
+  | "customer.access_revoked"
+  | "customer.access_restored";
 
 export type CustomerAuditEvent = {
   id: string;
   action: CustomerAuditAction;
-  changed_fields: Array<CustomerProfileAuditField | AgentConfigurationAuditField>;
+  changed_fields: Array<
+    CustomerProfileAuditField | AgentConfigurationAuditField | CustomerAccessAuditField
+  >;
   revision: number;
   actor_display_name: string;
   created_at: string;
@@ -96,11 +185,38 @@ export type CustomerAuditEvent = {
 
 export type CustomerDetail = CustomerSummary & {
   email: string | null;
+  access: CustomerAccess | null;
   open_order_count: number;
   profile_revision: number;
   agent_configuration: AgentConfiguration;
   recent_audit_events: CustomerAuditEvent[];
   recent_conversations: ConversationSummary[];
+};
+
+export type CustomerAccessStatus =
+  | "not_invited"
+  | "queued"
+  | "pending"
+  | "accepted"
+  | "revoked"
+  | "expired"
+  | "failed";
+
+export type CustomerAccess = {
+  email: string;
+  status: CustomerAccessStatus;
+  is_active: boolean;
+  invited_at: string | null;
+  expires_at: string | null;
+  accepted_at: string | null;
+};
+
+export type CustomerCreateRequest = {
+  full_name: string;
+  email: string;
+  external_ref?: string;
+  preferred_language: string;
+  plan_name: string;
 };
 
 export type CustomerUpdateRequest = {

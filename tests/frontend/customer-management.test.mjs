@@ -4,11 +4,17 @@ import test from "node:test";
 import {
   FALLBACK_AGENT_OPENING_MESSAGE,
   parseAgentConfigurationUpdatePayload,
+  parseCustomerCreatePayload,
   parseCustomerDetail,
   parseCustomerListResponse,
   parseCustomerListSearchParams,
   parseCustomerUpdatePayload,
   parseMeResponse,
+  parseCustomerVoiceToolListResponse,
+  parseCustomerVoiceToolUpdatePayload,
+  parseVoiceToolCreatePayload,
+  parseVoiceToolListResponse,
+  parseVoiceToolUpdatePayload,
   renderAgentOpeningTemplate,
 } from "../../src/lib/api-validation.ts";
 
@@ -58,6 +64,18 @@ function agentConfiguration(overrides = {}) {
   };
 }
 
+function customerAccess(overrides = {}) {
+  return {
+    email: "rahul@example.com",
+    status: "accepted",
+    is_active: true,
+    invited_at: "2026-08-01T09:30:00.000Z",
+    expires_at: "2026-08-31T09:30:00.000Z",
+    accepted_at: "2026-08-01T10:00:00.000Z",
+    ...overrides,
+  };
+}
+
 function auditEvent(overrides = {}) {
   return {
     id: "audit-event-1",
@@ -74,6 +92,7 @@ function customerDetail(overrides = {}) {
   return {
     ...customerSummary(),
     email: "rahul@example.com",
+    access: customerAccess(),
     open_order_count: 2,
     profile_revision: 2,
     agent_configuration: agentConfiguration(),
@@ -191,6 +210,7 @@ test("customer detail parser strips upstream extras and validates nested convers
   assert.deepEqual(detail, {
     ...customerSummary(),
     email: "rahul@example.com",
+    access: customerAccess(),
     open_order_count: 2,
     profile_revision: 2,
     agent_configuration: agentConfiguration(),
@@ -228,6 +248,8 @@ test("customer detail parser validates revisions, agent configuration, and audit
     customerDetail({ agent_configuration: agentConfiguration({ opening_message: "Hi {customer}" }) }),
     customerDetail({ agent_configuration: agentConfiguration({ opening_message: "Hi {first_name!r}" }) }),
     customerDetail({ agent_configuration: agentConfiguration({ instructions: "x".repeat(2_001) }) }),
+    customerDetail({ access: customerAccess({ status: "unknown" }) }),
+    customerDetail({ access: customerAccess({ invited_at: "yesterday" }) }),
     customerDetail({ recent_audit_events: [auditEvent({ action: "customer.deleted" })] }),
     customerDetail({ recent_audit_events: [auditEvent({ changed_fields: ["tenant_id"] })] }),
     customerDetail({ recent_audit_events: [auditEvent({ changed_fields: [] })] }),
@@ -266,6 +288,44 @@ test("customer detail parser validates revisions, agent configuration, and audit
     }))?.agent_configuration,
     agentConfiguration({ instructions: "", updated_at: null }),
   );
+});
+
+test("customer creation parser normalizes its allowlist and safe defaults", () => {
+  assert.deepEqual(
+    parseCustomerCreatePayload({
+      full_name: "  Devika Rao ",
+      email: " DEVIKA@EXAMPLE.COM ",
+      external_ref: " CUS-DEVIKA ",
+      preferred_language: " Hindi ",
+      plan_name: " Growth ",
+    }),
+    {
+      full_name: "Devika Rao",
+      email: "devika@example.com",
+      external_ref: "CUS-DEVIKA",
+      preferred_language: "Hindi",
+      plan_name: "Growth",
+    },
+  );
+  assert.deepEqual(
+    parseCustomerCreatePayload({ full_name: "Devika Rao", email: "devika@example.com" }),
+    {
+      full_name: "Devika Rao",
+      email: "devika@example.com",
+      preferred_language: "English",
+      plan_name: "Essential",
+    },
+  );
+
+  for (const payload of [
+    {},
+    { full_name: "Devika", email: "not-an-email" },
+    { full_name: " ", email: "devika@example.com" },
+    { full_name: "Devika", email: "devika@example.com", tenant_id: "other" },
+    { full_name: "Devika", email: "devika@example.com", external_ref: null },
+  ]) {
+    assert.equal(parseCustomerCreatePayload(payload), null);
+  }
 });
 
 test("customer list query accepts only canonical bounded filters", () => {
@@ -415,5 +475,120 @@ test("opening-message preview mirrors the bounded runtime fallback", () => {
   assert.equal(
     renderAgentOpeningTemplate("Hello {first_name}, again {first_name}.", "Rahul").valid,
     false,
+  );
+});
+
+test("voice tool parsers enforce the approved capability and revision contracts", () => {
+  const tool = {
+    id: "00000000-0000-4000-8000-000000000041",
+    tool_key: "get_order_status",
+    display_name: "Order status",
+    description: "Look up an order for the active customer.",
+    capability: "order_status",
+    is_enabled: true,
+    revision: 2,
+    assigned_customer_count: 4,
+    created_at: createdAt,
+    updated_at: lastConversationAt,
+  };
+  const event = {
+    id: "00000000-0000-4000-8000-000000000051",
+    action: "customer_voice_tool.updated",
+    tool_id: tool.id,
+    tool_key: tool.tool_key,
+    tool_display_name: tool.display_name,
+    customer_id: "00000000-0000-4000-8000-000000000002",
+    customer_reference: "CUS-1042",
+    changed_fields: ["is_enabled"],
+    revision: 3,
+    actor_display_name: "Ananya Rao",
+    created_at: lastConversationAt,
+  };
+  assert.deepEqual(parseVoiceToolListResponse({ items: [tool], total: 1, recent_events: [event] }), {
+    items: [tool],
+    total: 1,
+    recent_events: [event],
+  });
+  assert.equal(
+    parseVoiceToolListResponse({
+      items: [{ ...tool, capability: "fetch_any_url" }],
+      total: 1,
+      recent_events: [],
+    }),
+    null,
+  );
+  assert.equal(
+    parseVoiceToolListResponse({
+      items: [tool],
+      total: 1,
+      recent_events: [{ ...event, customer_id: null }],
+    }),
+    null,
+  );
+  assert.deepEqual(
+    parseCustomerVoiceToolListResponse({
+      customer_id: "00000000-0000-4000-8000-000000000002",
+      items: [
+        {
+          tool,
+          assigned: true,
+          is_enabled: true,
+          revision: 3,
+          updated_at: lastConversationAt,
+        },
+      ],
+    }),
+    {
+      customer_id: "00000000-0000-4000-8000-000000000002",
+      items: [
+        {
+          tool,
+          assigned: true,
+          is_enabled: true,
+          revision: 3,
+          updated_at: lastConversationAt,
+        },
+      ],
+    },
+  );
+  assert.equal(
+    parseCustomerVoiceToolListResponse({
+      customer_id: "00000000-0000-4000-8000-000000000002",
+      items: [{ tool, assigned: false, is_enabled: true, revision: null, updated_at: null }],
+    }),
+    null,
+  );
+  assert.deepEqual(
+    parseVoiceToolCreatePayload({
+      tool_key: "  find_booking  ",
+      display_name: "  Find booking  ",
+      description: "  Retrieve an upcoming reservation.  ",
+      capability: "reservation_lookup",
+    }),
+    {
+      tool_key: "find_booking",
+      display_name: "Find booking",
+      description: "Retrieve an upcoming reservation.",
+      capability: "reservation_lookup",
+      is_enabled: true,
+    },
+  );
+  assert.equal(
+    parseVoiceToolCreatePayload({
+      tool_key: "external_url",
+      display_name: "External URL",
+      description: "Unsafe arbitrary request",
+      capability: "http_request",
+    }),
+    null,
+  );
+  assert.deepEqual(parseVoiceToolUpdatePayload({ expected_revision: 2, is_enabled: false }), {
+    expected_revision: 2,
+    is_enabled: false,
+  });
+  assert.equal(parseVoiceToolUpdatePayload({ expected_revision: 2 }), null);
+  assert.deepEqual(
+    parseCustomerVoiceToolUpdatePayload({ is_enabled: true, expected_revision: null }),
+    { is_enabled: true, expected_revision: null },
   );
 });

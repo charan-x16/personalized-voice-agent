@@ -12,7 +12,9 @@ The web app and backend support both an isolated local mock flow and live browse
 - Clerk sign-in/sign-up with managed sessions and polished account controls
 - Role-aware customer and tenant-administrator workspaces
 - Searchable, filterable customer directory with revision-safe profile and voice-agent editors
+- Tenant-admin customer onboarding with Clerk invitation, resend, restore, and revoke controls
 - Per-customer agent name, greeting preview, tone, and bounded custom instructions
+- Tenant-admin read-only voice previews using a selected customer's approved context
 - Recent admin-change timeline that records changed field names without duplicating values
 - Live profile and dashboard data from `GET /v1/me` and `GET /v1/conversations`
 - Searchable conversation archive and transcript detail view backed by the API
@@ -98,7 +100,7 @@ On PowerShell, use `if (-not (Test-Path .env)) { Copy-Item .env.example .env }` 
 The default backend configuration creates `apps/api/svara.db` and idempotently seeds these application profiles:
 
 - Customer account: `rahul@example.com`
-- Workspace administrator: `ananya@acme.example`
+- Workspace administrator: `ananya@example.com`
 - Five example customers and three example orders, including `ORD-8294`
 
 ### 2. Start the frontend
@@ -124,7 +126,7 @@ pnpm install
 pnpm dev
 ```
 
-The preferred setup is `clerk init --app app_3J2EY1ljMXFFTN6tlNCp7eU1wJu`, followed by `clerk env pull --file .env.local` and `clerk env pull --file apps/api/.env`. The backend needs `CLERK_SECRET_KEY`; it is never sent to the browser. Open [http://localhost:3000](http://localhost:3000) and create the first test account from the navigation. In a Clerk development instance, `rahul+clerk_test@example.com` links to the seeded `rahul@example.com` customer and can be verified with code `424242`. Use `ananya+clerk_test@acme.example` for the seeded administrator.
+The preferred setup is `clerk init --app app_3J2EY1ljMXFFTN6tlNCp7eU1wJu`, followed by `clerk env pull --file .env.local` and `clerk env pull --file apps/api/.env`. The backend needs `CLERK_SECRET_KEY`; it is never sent to the browser. Open [http://localhost:3000](http://localhost:3000) and create the first test account from the navigation. In a Clerk development instance, `rahul+clerk_test@example.com` links to the seeded `rahul@example.com` customer and can be verified with code `424242`. Use `ananya+clerk_test@example.com` for the seeded administrator.
 
 To use PostgreSQL instead, run `docker compose up -d postgres` from the repository root and set:
 
@@ -146,15 +148,21 @@ All routes use the `/v1` prefix.
 | Endpoint | Caller | Purpose |
 | --- | --- | --- |
 | `GET /health` | Infrastructure | Verifies the API can execute a database query |
+| `POST /webhooks/clerk` | Clerk/Svix signed webhook | Idempotently reconciles supported Clerk user lifecycle events |
 | `POST /auth/demo-login` | Local SQLite API tests only | Issues a short-lived token for a seeded demo user |
 | `GET /me` | Authenticated Next.js server | Returns the current user's minimal profile |
 | `GET /customers` | Tenant administrator | Searches and paginates customers in the authenticated tenant |
+| `POST /customers` | Tenant administrator | Creates a scoped customer, default agent configuration, access user, and Clerk invitation |
 | `GET /customers/{customer_id}` | Tenant administrator | Returns a scoped profile, agent configuration, recent audit events, and activity summary |
+| `POST /customers/{customer_id}/access/invitation` | Tenant administrator | Resends an invitation or restores a previously linked local account |
+| `POST /customers/{customer_id}/access/revoke` | Tenant administrator | Disables local access and revokes a pending invitation when present |
 | `PATCH /customers/{customer_id}` | Tenant administrator | Revision-safely updates only name, preferred language, plan, or active state |
 | `PATCH /customers/{customer_id}/agent-configuration` | Tenant administrator | Revision-safely updates the customer's provider-neutral agent behavior |
+| `GET/POST/PATCH /tools...` | Tenant administrator | Manages approved workspace tools and per-customer assignments |
 | `GET /conversations` | Authenticated Next.js server | Lists completed conversations in the current customer scope |
 | `GET /conversations/{session_id}` | Authenticated Next.js server | Returns one scoped transcript and outcome |
 | `POST /voice/sessions` | Authenticated Next.js BFF | Creates a customer-scoped mock/provider session |
+| `POST /voice/customers/{customer_id}/preview-sessions` | Tenant administrator through the Next.js BFF | Creates an attributed, read-only preview for one active in-tenant customer |
 | `WS /voice/stream` | Browser with encrypted relay token | Relays 16 kHz PCM and bounded live events through the server-side Sarvam SDK |
 | `POST /voice/sessions/{session_id}/cancel` | Authenticated Next.js BFF | Idempotently stops a scoped provider session and releases its active slot after confirmed termination |
 | `POST /voice/sessions/{session_id}/mock-complete` | Authenticated Next.js BFF | Completes a mock call in development/test only |
@@ -165,13 +173,14 @@ All routes use the `/v1` prefix.
 | `POST /sarvam/tools/find-reservation` | Voice provider | Finds a reference or upcoming customer reservations |
 | `POST /sarvam/tools/reschedule-reservation` | Voice provider | Moves a reservation with an optimistic version check |
 | `POST /sarvam/tools/cancel-reservation` | Voice provider | Cancels a reservation with retry-safe idempotency |
+| `POST /sarvam/tools/execute/{tool_key}` | Voice provider | Executes an enabled, customer-assigned capability through the guarded registry |
 | `POST /sarvam/hooks/on-end` | Voice provider | Stores the first bounded outcome and safely handles retries |
 
-Clerk components handle browser sign-in, sign-up, account recovery, and sign-out. The browser calls same-origin BFF routes for customer reads and updates, voice-session creation/cancellation, and development-only mock completion. Authenticated server-rendered pages use `await auth()` and forward a short-lived Clerk session token to FastAPI. Direct FastAPI client calls require `Authorization: Bearer <Clerk session token>`; the local demo token remains limited to isolated SQLite API tests.
+Clerk components handle browser sign-in, sign-up, account recovery, and sign-out. Tenant administrators can pre-provision a customer and send a Clerk invitation from Svara; invitation metadata is operational state only, while the local active user-to-tenant/customer mapping remains the authorization source. Invitation and revocation calls are recorded in a durable database outbox before Clerk is contacted, and a separate worker retries transient failures. The signed Clerk webhook reconciles `user.created`, `user.updated`, and `user.deleted` idempotently. The browser calls same-origin BFF routes for customer reads and updates, voice-session creation/cancellation, and development-only mock completion. Authenticated server-rendered pages use `await auth()` and forward a short-lived Clerk session token to FastAPI. Direct FastAPI client calls require `Authorization: Bearer <Clerk session token>`; the local demo token remains limited to isolated SQLite API tests.
 
-Administrators cannot choose a tenant, impersonate a customer, use customer voice routes, or delete history. A cross-tenant customer identifier is returned as not found. Profile and agent edits require the revision returned by the detail endpoint; a stale update receives `409` instead of silently overwriting newer work. See the [customer-management security boundary](docs/customer-management.md) and [production-hardening guide](docs/production-hardening.md) for the request flow, migration procedure, and remaining release gates.
+Administrators cannot choose a tenant, impersonate a customer through the customer voice route, or delete history. They can start an explicit preview from an active in-tenant customer profile. Preview sessions are attributed to the initiating administrator, excluded from customer conversation history, and blocked from reservation or other state-changing tools. A cross-tenant customer identifier is returned as not found. Profile and agent edits require the revision returned by the detail endpoint; a stale update receives `409` instead of silently overwriting newer work. See the [customer-management security boundary](docs/customer-management.md) and [production-hardening guide](docs/production-hardening.md) for the request flow, migration procedure, and remaining release gates.
 
-Sarvam-facing hooks and tools require `X-Voice-Tool-Key` and the backend-only `conversation_ref` injected into the provider session. When `on-start` supplies a provider `interaction_id`, later tool and completion calls must supply that same value.
+Sarvam-facing hooks and tools require `X-Voice-Tool-Key` and the backend-only `conversation_ref` injected into the provider session. When `on-start` supplies a provider `interaction_id`, later tool and completion calls must supply that same value. The [custom voice-tool guide](docs/custom-voice-tools.md) documents the tenant registry, customer assignments, and exact Sarvam HTTP-tool envelope.
 
 Only one active voice session can be reserved for a customer. A second start returns `409`; a later start can reclaim a slot whose session has expired. Successful authentication and session-bootstrap responses include `Cache-Control: no-store`.
 
@@ -185,6 +194,7 @@ Only one active voice session can be reserved for a customer. A second start ret
 - Only non-production SQLite startup may create a development schema. PostgreSQL startup never creates or seeds tables; its schema must be explicitly migrated before use.
 - Application-level tenant scoping is implemented. New reservation tables also enable PostgreSQL row-level security and deny Supabase Data API access to `anon` and `authenticated`; broader database RLS and rate limiting remain production work.
 - Administrative updates are allowlisted, revision-checked, and recorded in an application append-only audit trail. Production database roles must separately deny direct mutation of that table where required.
+- Clerk webhook receipts and invitation outbox tables are not exposed to Supabase `anon` or `authenticated` roles. Outbox workers use short claims, `SKIP LOCKED` on PostgreSQL, bounded backoff, stale-claim recovery, and generation checks that prevent an older job from reversing a newer access decision.
 - Transcripts are bounded, but production still requires an explicit retention/deletion policy, encryption, and access controls.
 
 See [apps/api/README.md](apps/api/README.md) for request examples and lifecycle semantics, and the [Sarvam integration audit](docs/sarvam-integration-audit.md) for confirmed capabilities, implementation boundaries, pricing considerations, and dashboard configuration.
@@ -196,6 +206,7 @@ Frontend:
 ```bash
 pnpm typecheck
 pnpm lint
+pnpm test:unit
 pnpm build
 ```
 
@@ -210,11 +221,13 @@ uv run pytest
 
 ## Production gaps
 
-- Replace automatic first-access email linking with an explicit Clerk invitation/webhook provisioning workflow where the same email must belong to multiple tenants.
-- Configure the production Clerk account lifecycle, recovery/MFA policy, invitation flow, authorized parties, and application-level auth abuse controls.
+- Deploy the Clerk invitation outbox worker as a separate continuously running process and alert on retry/dead-letter growth. The API performs one immediate best-effort attempt, but production reliability depends on the worker.
+- Configure the signed Clerk webhook endpoint at `/v1/webhooks/clerk` for `user.created`, `user.updated`, and `user.deleted`, and set its signing secret in the API environment.
+- Decide on an explicit multi-workspace membership model before allowing one email in multiple tenants; onboarding currently rejects globally duplicated application emails to keep first-access linking unambiguous.
+- Configure the production Clerk account lifecycle, recovery/MFA policy, invitation email template, authorized parties, and application-level auth abuse controls.
 - Add durable coordination for active SDK connections before running multiple API workers; the current in-memory relay registry requires one worker or sticky routing.
 - Configure the committed Sarvam agent variables and map its HTTP tools to the public backend using the shared tool credential and opaque conversation reference.
-- Apply migration `20260909_0003`, provision the production policy/table inventory, and configure the five reservation tools using [the v2 mapping guide](docs/sarvam-v2-reservation-tools.md).
+- Apply all migrations through `20260923_0008`, provision the production policy/table inventory, and configure the registered HTTP tools using the [custom tool guide](docs/custom-voice-tools.md) and [v2 reservation mapping](docs/sarvam-v2-reservation-tools.md).
 - Preserve the backend-to-provider reference boundary: neither the conversation reference nor provider agent variables should be returned by browser-facing endpoints.
 - Run the versioned database migration as a single deployment step before starting each production release; production startup intentionally does not create tables.
 - Add secret management and rotation, rate limiting, database-level row security where appropriate, and operational monitoring.
