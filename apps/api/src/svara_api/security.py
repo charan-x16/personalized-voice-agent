@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .config import Settings
 from .database import get_db
 from .dependencies import get_app_settings
-from .models import Customer, Tenant, User
+from .models import Customer, Tenant, User, utc_now
 
 _BEARER_SCHEME = HTTPBearer(auto_error=False)
 _BASE64URL_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -397,7 +397,11 @@ async def _link_clerk_subject_by_verified_email(
         result = await db.execute(
             update(User)
             .where(User.id == user.id, User.clerk_user_id.is_(None))
-            .values(clerk_user_id=subject)
+            .values(
+                clerk_user_id=subject,
+                invitation_status="accepted",
+                invitation_accepted_at=utc_now(),
+            )
         )
         if result.rowcount == 1:
             await db.commit()

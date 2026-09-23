@@ -31,6 +31,7 @@ type UseVoiceSessionOptions = {
   openingMessage: string;
   preferredLanguage: string;
   suggestions: VoiceSuggestion[];
+  sessionEndpoint?: string;
 };
 
 type ActiveSession = {
@@ -88,10 +89,11 @@ function startErrorMessage(error: unknown): string {
 }
 
 async function requestVoiceSession(
+  endpoint: string,
   language: string,
   signal: AbortSignal,
 ): Promise<VoiceSessionResponse> {
-  const response = await fetch("/api/voice/sessions", {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ language }),
@@ -196,6 +198,7 @@ export function useVoiceSession({
   openingMessage,
   preferredLanguage,
   suggestions,
+  sessionEndpoint = "/api/voice/sessions",
 }: UseVoiceSessionOptions) {
   const [state, dispatch] = useReducer(voiceSessionReducer, initialVoiceSessionState);
   const mountedRef = useRef(true);
@@ -334,7 +337,11 @@ export function useVoiceSession({
     lifecycleControllerRef.current = controller;
 
     try {
-      const session = await requestVoiceSession(preferredLanguage, controller.signal);
+      const session = await requestVoiceSession(
+        sessionEndpoint,
+        preferredLanguage,
+        controller.signal,
+      );
       if (!mountedRef.current || run !== generationRef.current) {
         void cancelVoiceSession(session.session_id, true);
         return;
@@ -418,6 +425,7 @@ export function useVoiceSession({
     openingMessage,
     preferredLanguage,
     responseByPrompt,
+    sessionEndpoint,
     stopLocalResources,
   ]);
 

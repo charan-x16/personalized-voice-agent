@@ -11,10 +11,15 @@ from svara_api.database import Database
 from svara_api.models import (
     CafeReservation,
     CafeTable,
+    ClerkInvitationOutbox,
+    ClerkWebhookEvent,
     Customer,
+    CustomerVoiceTool,
     ReservationPolicy,
     Tenant,
     VoiceSession,
+    VoiceToolAdminEvent,
+    VoiceToolDefinition,
 )
 
 
@@ -34,6 +39,21 @@ async def main() -> None:
                 "cafe_tables": await session.scalar(select(func.count()).select_from(CafeTable)),
                 "cafe_reservations": await session.scalar(
                     select(func.count()).select_from(CafeReservation)
+                ),
+                "clerk_invitation_outbox": await session.scalar(
+                    select(func.count()).select_from(ClerkInvitationOutbox)
+                ),
+                "clerk_webhook_events": await session.scalar(
+                    select(func.count()).select_from(ClerkWebhookEvent)
+                ),
+                "voice_tool_definitions": await session.scalar(
+                    select(func.count()).select_from(VoiceToolDefinition)
+                ),
+                "customer_voice_tools": await session.scalar(
+                    select(func.count()).select_from(CustomerVoiceTool)
+                ),
+                "voice_tool_admin_events": await session.scalar(
+                    select(func.count()).select_from(VoiceToolAdminEvent)
                 ),
             }
         print(counts)

@@ -8,6 +8,7 @@ import {
   Languages,
   LockKeyhole,
   MessageSquareText,
+  Mic,
   PackageCheck,
   ReceiptText,
   UserRound,
@@ -16,8 +17,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { AgentConfigurationEditor } from "@/components/agent-configuration-editor";
+import { CustomerAccessCard } from "@/components/customer-access-card";
 import { CustomerEditor } from "@/components/customer-editor";
-import { BackendApiError, getCurrentProfile, getCustomer } from "@/lib/server-api";
+import { CustomerToolEditor } from "@/components/customer-tool-editor";
+import { BackendApiError, getCurrentProfile, getCustomer, getCustomerVoiceTools } from "@/lib/server-api";
 import {
   conversationPreview,
   conversationTitle,
@@ -59,10 +62,16 @@ const auditFieldLabels: Record<string, string> = {
   plan_name: "Plan",
   preferred_language: "Language",
   tone: "Conversation tone",
+  access_status: "Workspace access",
 };
 
 function auditActionLabel(action: string) {
   if (action === "customer.agent_configuration_updated") return "Agent configuration updated";
+  if (action === "customer.created") return "Customer created";
+  if (action === "customer.access_invitation_sent") return "Access invitation sent";
+  if (action === "customer.access_invitation_failed") return "Access invitation failed";
+  if (action === "customer.access_revoked") return "Customer access revoked";
+  if (action === "customer.access_restored") return "Customer access restored";
   return "Customer profile updated";
 }
 
@@ -89,6 +98,8 @@ export default async function CustomerDetailPage({
     throw error;
   }
   if (!customer) redirect("/sign-in");
+  const customerTools = await getCustomerVoiceTools(customer.id);
+  if (!customerTools) redirect("/sign-in");
 
   const resolvedRate = customer.conversation_count
     ? `${Math.round(
@@ -112,10 +123,23 @@ export default async function CustomerDetailPage({
             <p className={styles.detailReference}>Reference {customer.external_ref}</p>
           </div>
         </div>
-        <span className={`${styles.status} ${styles.detailHeaderStatus} ${customer.is_active ? styles.active : styles.inactive}`}>
-          <span aria-hidden="true" />
-          {customer.is_active ? "Profile active" : "Profile inactive"}
-        </span>
+        <div className={styles.detailHeaderActions}>
+          <span className={`${styles.status} ${styles.detailHeaderStatus} ${customer.is_active ? styles.active : styles.inactive}`}>
+            <span aria-hidden="true" />
+            {customer.is_active ? "Profile active" : "Profile inactive"}
+          </span>
+          {customer.is_active ? (
+            <Link href={`/customers/${encodeURIComponent(customer.id)}/preview`} className={styles.previewAgentButton}>
+              <Mic size={16} strokeWidth={1.9} aria-hidden="true" />
+              Test voice agent
+            </Link>
+          ) : (
+            <span className={`${styles.previewAgentButton} ${styles.previewAgentButtonDisabled}`} aria-disabled="true">
+              <Mic size={16} strokeWidth={1.9} aria-hidden="true" />
+              Activate profile to test
+            </span>
+          )}
+        </div>
       </header>
 
       <dl className={styles.detailMeta}>
@@ -139,7 +163,9 @@ export default async function CustomerDetailPage({
 
       <nav className={styles.detailSectionNav} aria-label="Customer profile sections">
         <a href="#profile-settings">Profile</a>
+        <a href="#customer-access">Access</a>
         <a href="#agent-settings">Agent</a>
+        <a href="#customer-tools">Tools</a>
         <a href="#admin-changes">Changes</a>
         <a href="#customer-activity">Activity</a>
       </nav>
@@ -185,6 +211,8 @@ export default async function CustomerDetailPage({
             </dl>
           </section>
 
+          <CustomerAccessCard customer={customer} />
+
           <section className={styles.privacyCard} aria-label="Customer data boundary">
             <LockKeyhole size={18} strokeWidth={1.7} aria-hidden="true" />
             <div>
@@ -205,6 +233,10 @@ export default async function CustomerDetailPage({
           customerFirstName={customerFirstName}
           configuration={customer.agent_configuration}
         />
+      </div>
+
+      <div id="customer-tools">
+        <CustomerToolEditor initial={customerTools} />
       </div>
 
       <section className={styles.auditSection} id="admin-changes" aria-labelledby="customer-audit-title">

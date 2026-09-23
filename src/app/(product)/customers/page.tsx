@@ -6,6 +6,7 @@ import {
   ShieldCheck,
   UserRoundCheck,
   UsersRound,
+  UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -122,9 +123,14 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
             Manage the verified customer context used to personalise every voice conversation.
           </p>
         </div>
-        <div className={styles.scopeNote}>
-          <ShieldCheck size={17} strokeWidth={1.7} aria-hidden="true" />
-          <span><strong>Tenant isolated</strong>Only {profile.workspace_name} records</span>
+        <div className={styles.directoryHeaderActions}>
+          <div className={styles.scopeNote}>
+            <ShieldCheck size={17} strokeWidth={1.7} aria-hidden="true" />
+            <span><strong>Tenant isolated</strong>Only {profile.workspace_name} records</span>
+          </div>
+          <Link href="/customers/new" className="button button-primary">
+            <UserPlus size={16} aria-hidden="true" /> Add customer
+          </Link>
         </div>
       </header>
 

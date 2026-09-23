@@ -158,11 +158,23 @@ database created before migrations were introduced must be reconciled explicitly
 disposable development database, or validate its exact schema before stamping the baseline); do
 not blindly stamp an unknown shared database.
 
+## Clerk lifecycle reliability
+
+Configure a Clerk webhook endpoint at `https://<api-host>/v1/webhooks/clerk`, subscribe only to `user.created`, `user.updated`, and `user.deleted`, and store its `whsec_...` value in `CLERK_WEBHOOK_SIGNING_SECRET`. The handler verifies the untouched request body with Svix, records the message ID in the same transaction as the reconciliation, returns `2xx` for duplicates, and does not retain the full identity payload.
+
+Run the durable invitation processor independently from the API:
+
+```bash
+uv run python scripts/process_invitation_outbox.py --watch
+```
+
+The outbox is the retry source of truth. Alert on old `pending` rows, recovered stale `processing` rows, and any `dead_letter` row. Do not run a custom retry process that bypasses the claim and access-generation checks.
+
 ## Controls still required before production
 
-- Replace automatic first-access email linking with an explicit Clerk invitation/webhook
-  provisioning workflow when one email must belong to multiple tenants, and define the
-  recovery, MFA, and deprovisioning lifecycle.
+- Design an explicit multi-workspace membership selector before allowing one email in multiple
+  tenants; onboarding currently rejects global application-email duplicates so first-access
+  linking stays unambiguous. Define the production recovery, MFA, and deprovisioning lifecycle.
 - Apply least-privilege database roles, database-level tenant controls where appropriate,
   encrypted backups, retention/deletion policy, and secret rotation.
 - Add rate limits, abuse controls, structured monitoring, and alerting for authentication, tool,

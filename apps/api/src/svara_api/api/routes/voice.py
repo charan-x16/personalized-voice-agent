@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
 from sqlalchemy import case, select, update
@@ -26,6 +26,7 @@ from ...security import (
     generate_conversation_ref,
     get_current_actor,
     hash_conversation_ref,
+    require_tenant_admin,
 )
 from ...services.voice_provider import (
     VoiceProvider,
@@ -269,33 +270,25 @@ async def _finalize_cancellation(
     return voice_session
 
 
-@router.post(
-    "/sessions",
-    response_model=VoiceSessionResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_voice_session(
+async def _create_voice_session_for_customer(
     payload: VoiceSessionCreateRequest,
     response: Response,
-    actor: Annotated[Actor, Depends(get_current_actor)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-    settings: Annotated[Settings, Depends(get_app_settings)],
-    provider: Annotated[VoiceProvider, Depends(get_voice_provider)],
+    actor: Actor,
+    db: AsyncSession,
+    settings: Settings,
+    provider: VoiceProvider,
+    *,
+    customer_id: str,
+    session_mode: Literal["customer", "admin_preview"],
 ) -> VoiceSessionResponse:
-    """Start a voice session for the authenticated actor's own customer profile."""
-
-    if actor.customer_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="A customer profile is required to start a voice session.",
-        )
+    """Reserve and bootstrap a customer-scoped provider session."""
 
     # Customer deactivation takes the same row lock. Whichever transaction wins is
     # observed before a slot is reserved, so an administrator cannot orphan a call.
     customer = await db.scalar(
         select(Customer)
         .where(
-            Customer.id == actor.customer_id,
+            Customer.id == customer_id,
             Customer.tenant_id == actor.tenant_id,
             Customer.is_active.is_(True),
         )
@@ -326,6 +319,8 @@ async def create_voice_session(
         id=new_id(),
         tenant_id=actor.tenant_id,
         customer_id=customer.id,
+        session_mode=session_mode,
+        initiated_by_user_id=actor.user_id,
         provider=provider.name,
         conversation_ref_hash=hash_conversation_ref(conversation_ref),
         status="creating",
@@ -589,6 +584,66 @@ async def create_voice_session(
             websocket_url=provider_session.websocket_url,
             expires_at=public_expiry,
         ),
+    )
+
+
+@router.post(
+    "/sessions",
+    response_model=VoiceSessionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_voice_session(
+    payload: VoiceSessionCreateRequest,
+    response: Response,
+    actor: Annotated[Actor, Depends(get_current_actor)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+    provider: Annotated[VoiceProvider, Depends(get_voice_provider)],
+) -> VoiceSessionResponse:
+    """Start a voice session for the authenticated actor's own customer profile."""
+
+    if actor.customer_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A customer profile is required to start a voice session.",
+        )
+    return await _create_voice_session_for_customer(
+        payload,
+        response,
+        actor,
+        db,
+        settings,
+        provider,
+        customer_id=actor.customer_id,
+        session_mode="customer",
+    )
+
+
+@router.post(
+    "/customers/{customer_id}/preview-sessions",
+    response_model=VoiceSessionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_admin_preview_session(
+    customer_id: Annotated[str, Path(min_length=1, max_length=64)],
+    payload: VoiceSessionCreateRequest,
+    response: Response,
+    actor: Annotated[Actor, Depends(require_tenant_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+    provider: Annotated[VoiceProvider, Depends(get_voice_provider)],
+) -> VoiceSessionResponse:
+    """Preview one tenant-scoped customer agent without impersonating the customer."""
+
+    return await _create_voice_session_for_customer(
+        payload,
+        response,
+        actor,
+        db,
+        settings,
+        provider,
+        customer_id=customer_id,
+        session_mode="admin_preview",
     )
 
 

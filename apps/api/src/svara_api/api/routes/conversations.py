@@ -91,14 +91,23 @@ async def load_scoped_conversation(
     session_id: str,
     lock: bool = False,
 ) -> tuple[VoiceSession, ConversationOutcome | None]:
-    customer_id = require_customer_id(actor)
+    if actor.customer_id is None:
+        actor_scope = (
+            VoiceSession.session_mode == "admin_preview",
+            VoiceSession.initiated_by_user_id == actor.user_id,
+        )
+    else:
+        actor_scope = (
+            VoiceSession.session_mode == "customer",
+            VoiceSession.customer_id == actor.customer_id,
+        )
     statement = (
         select(VoiceSession, ConversationOutcome)
         .outerjoin(ConversationOutcome, ConversationOutcome.session_id == VoiceSession.id)
         .where(
             VoiceSession.id == session_id,
             VoiceSession.tenant_id == actor.tenant_id,
-            VoiceSession.customer_id == customer_id,
+            *actor_scope,
         )
     )
     if lock:
@@ -131,6 +140,7 @@ async def list_conversations(
     scope = (
         VoiceSession.tenant_id == actor.tenant_id,
         VoiceSession.customer_id == customer_id,
+        VoiceSession.session_mode == "customer",
     )
     normalized_resolution = func.lower(func.trim(func.coalesce(ConversationOutcome.resolution, "")))
     outcome_group = case(

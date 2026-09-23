@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime, time
 from typing import Any, Literal
 
@@ -103,6 +104,115 @@ class OrderStatusResponse(StrictModel):
     status: str
     estimated_arrival: str | None
     delivery_city: str | None
+
+
+VoiceToolCapability = Literal[
+    "customer_profile",
+    "order_status",
+    "reservation_availability",
+    "reservation_lookup",
+    "reservation_create",
+    "reservation_reschedule",
+    "reservation_cancel",
+]
+
+
+class VoiceToolDefinitionResponse(StrictModel):
+    id: str
+    tool_key: str
+    display_name: str
+    description: str
+    capability: VoiceToolCapability
+    is_enabled: bool
+    revision: int = Field(ge=1)
+    assigned_customer_count: int = Field(ge=0)
+    created_at: datetime
+    updated_at: datetime
+
+
+class VoiceToolAdminEventResponse(StrictModel):
+    id: str
+    action: Literal[
+        "voice_tool.created",
+        "voice_tool.updated",
+        "customer_voice_tool.updated",
+    ]
+    tool_id: str
+    tool_key: str
+    tool_display_name: str
+    customer_id: str | None
+    customer_reference: str | None
+    changed_fields: list[str]
+    revision: int = Field(ge=1)
+    actor_display_name: str = Field(min_length=1, max_length=160)
+    created_at: datetime
+
+
+class VoiceToolListResponse(StrictModel):
+    items: list[VoiceToolDefinitionResponse]
+    total: int = Field(ge=0)
+    recent_events: list[VoiceToolAdminEventResponse]
+
+
+class VoiceToolCreateRequest(StrictModel):
+    tool_key: str = Field(min_length=3, max_length=80, pattern=r"^[a-z][a-z0-9_]*$")
+    display_name: str = Field(min_length=1, max_length=80)
+    description: str = Field(min_length=1, max_length=500)
+    capability: VoiceToolCapability
+    is_enabled: bool = True
+
+    @field_validator("tool_key", "display_name", "description", mode="before")
+    @classmethod
+    def trim_tool_fields(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+
+class VoiceToolUpdateRequest(StrictModel):
+    expected_revision: int = Field(ge=1, strict=True)
+    display_name: str | None = Field(default=None, min_length=1, max_length=80)
+    description: str | None = Field(default=None, min_length=1, max_length=500)
+    is_enabled: bool | None = None
+
+    @field_validator("display_name", "description", mode="before")
+    @classmethod
+    def trim_optional_tool_fields(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def require_tool_change(self) -> "VoiceToolUpdateRequest":
+        if self.display_name is None and self.description is None and self.is_enabled is None:
+            raise ValueError("At least one tool field must be provided")
+        return self
+
+
+class CustomerVoiceToolResponse(StrictModel):
+    tool: VoiceToolDefinitionResponse
+    assigned: bool
+    is_enabled: bool
+    revision: int | None = Field(default=None, ge=1)
+    updated_at: datetime | None
+
+
+class CustomerVoiceToolListResponse(StrictModel):
+    customer_id: str
+    items: list[CustomerVoiceToolResponse]
+
+
+class CustomerVoiceToolUpdateRequest(StrictModel):
+    is_enabled: bool
+    expected_revision: int | None = Field(default=None, ge=1, strict=True)
+
+
+class VoiceToolExecuteRequest(StrictModel):
+    conversation_ref: str = Field(min_length=24, max_length=256)
+    interaction_id: str | None = Field(default=None, max_length=160)
+    arguments: dict[str, Any] = Field(default_factory=dict)
+
+
+class CustomerProfileToolResponse(StrictModel):
+    full_name: str
+    preferred_language: str
+    plan_name: str
 
 
 class ReservationToolRequest(StrictModel):
@@ -270,6 +380,7 @@ class CustomerListResponse(StrictModel):
 
 class CustomerDetailResponse(CustomerSummaryResponse):
     email: str | None
+    access: "CustomerAccessResponse | None"
     open_order_count: int = Field(ge=0)
     profile_revision: int = Field(ge=1)
     agent_configuration: "AgentConfigurationResponse"
@@ -291,11 +402,63 @@ class AdminAuditEventResponse(StrictModel):
     action: Literal[
         "customer.profile_updated",
         "customer.agent_configuration_updated",
+        "customer.created",
+        "customer.access_invitation_sent",
+        "customer.access_invitation_failed",
+        "customer.access_revoked",
+        "customer.access_restored",
     ]
     changed_fields: list[str]
     revision: int = Field(ge=1)
     actor_display_name: str = Field(min_length=1, max_length=160)
     created_at: datetime
+
+
+class CustomerAccessResponse(StrictModel):
+    email: str
+    status: Literal[
+        "not_invited",
+        "queued",
+        "pending",
+        "accepted",
+        "revoked",
+        "expired",
+        "failed",
+    ]
+    is_active: bool
+    invited_at: datetime | None
+    expires_at: datetime | None
+    accepted_at: datetime | None
+
+
+class CustomerCreateRequest(StrictModel):
+    full_name: str = Field(min_length=1, max_length=160)
+    email: str = Field(min_length=3, max_length=254)
+    external_ref: str | None = Field(default=None, min_length=1, max_length=120)
+    preferred_language: str = Field(default="English", min_length=2, max_length=40)
+    plan_name: str = Field(default="Essential", min_length=1, max_length=80)
+
+    @field_validator(
+        "full_name",
+        "email",
+        "external_ref",
+        "preferred_language",
+        "plan_name",
+        mode="before",
+    )
+    @classmethod
+    def trim_fields(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.casefold()
+        if not re.fullmatch(r"[^@\s]{1,64}@[^@\s]{1,189}", normalized):
+            raise ValueError("Enter a valid email address")
+        return normalized
 
 
 class CustomerUpdateRequest(StrictModel):

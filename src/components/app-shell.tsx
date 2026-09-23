@@ -7,6 +7,7 @@ import {
   Home,
   LogOut,
   Menu,
+  Wrench,
   UsersRound,
   X,
 } from "lucide-react";
@@ -32,6 +33,7 @@ const customerNavigation = [
 
 const adminNavigation = [
   { href: "/customers", label: "Customers", icon: UsersRound },
+  { href: "/tools", label: "Agent tools", icon: Wrench },
 ];
 
 export function AppShell({

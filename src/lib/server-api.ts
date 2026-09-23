@@ -8,7 +8,9 @@ import type {
   CustomerDetail,
   CustomerListQuery,
   CustomerListResponse,
+  CustomerVoiceToolListResponse,
   MeResponse,
+  VoiceToolListResponse,
 } from "@/lib/api-types";
 import {
   parseConversationDetailResponse,
@@ -16,7 +18,9 @@ import {
   parseCustomerDetail,
   parseCustomerListResponse,
   parseCustomerListSearchParams,
+  parseCustomerVoiceToolListResponse,
   parseMeResponse,
+  parseVoiceToolListResponse,
 } from "@/lib/api-validation";
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
 const BACKEND_TIMEOUT_MS = 12_000;
@@ -205,4 +209,24 @@ export async function getCustomer(id: string): Promise<CustomerDetail | null> {
     throw new BackendApiError("The application service returned an invalid response.", 502);
   }
   return customer;
+}
+
+export function getVoiceTools(): Promise<VoiceToolListResponse | null> {
+  return authenticatedJson<VoiceToolListResponse>("/v1/tools", parseVoiceToolListResponse);
+}
+
+export async function getCustomerVoiceTools(
+  customerId: string,
+): Promise<CustomerVoiceToolListResponse | null> {
+  if (!SAFE_CUSTOMER_ID.test(customerId)) {
+    throw new BackendApiError("Invalid customer identifier.", 400);
+  }
+  const result = await authenticatedJson<CustomerVoiceToolListResponse>(
+    `/v1/tools/customer-assignments/${encodeURIComponent(customerId)}`,
+    parseCustomerVoiceToolListResponse,
+  );
+  if (result !== null && result.customer_id !== customerId) {
+    throw new BackendApiError("The application service returned an invalid response.", 502);
+  }
+  return result;
 }

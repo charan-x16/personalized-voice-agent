@@ -1,0 +1,156 @@
+.card {
+  padding: 23px;
+  background: rgba(251, 250, 247, 0.76);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.card > h2,
+.heading h2 {
+  margin: 6px 0 0;
+  font-family: var(--font-serif);
+  font-size: 1.45rem;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+.heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.heading > svg {
+  color: var(--muted);
+}
+
+.description {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.status {
+  display: flex;
+  gap: 11px;
+  margin-top: 18px;
+  padding: 13px;
+  background: rgba(236, 231, 220, 0.52);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.status > span {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  flex: 0 0 auto;
+  place-items: center;
+  background: var(--paper-strong);
+  border-radius: 50%;
+}
+
+.status strong {
+  font-size: var(--text-sm);
+}
+
+.status p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.accepted {
+  background: rgba(223, 233, 225, 0.6);
+  border-color: rgba(88, 114, 97, 0.18);
+  color: #35513f;
+}
+
+.failed,
+.expired,
+.revoked {
+  background: rgba(223, 95, 63, 0.07);
+  border-color: rgba(180, 55, 37, 0.14);
+}
+
+.details {
+  display: grid;
+  gap: 0;
+  margin: 16px 0 0;
+}
+
+.details div {
+  display: grid;
+  grid-template-columns: 94px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-xs);
+}
+
+.details dt {
+  color: var(--muted);
+}
+
+.details dd {
+  overflow: hidden;
+  margin: 0;
+  font-weight: 620;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 17px;
+}
+
+.actions button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 13px;
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-pill);
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 680;
+}
+
+.actions button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.actions .revokeButton {
+  background: transparent;
+  border-color: var(--line-strong);
+  color: #8f2e20;
+}
+
+.error {
+  margin: 13px 0 0;
+  color: #8f2e20;
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.spinner {
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

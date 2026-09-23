@@ -80,7 +80,7 @@ def test_archive_search_finds_older_records_and_paginates_filtered_results(api: 
 def test_profile_exposes_configured_agent_identity_but_not_private_instructions(
     api: ApiHarness,
 ) -> None:
-    admin = {"Authorization": f"Bearer {_login(api.client, 'ananya@acme.example')}"}
+    admin = {"Authorization": f"Bearer {_login(api.client, 'ananya@example.com')}"}
     update = api.client.patch(
         f"/v1/customers/{DEMO_CUSTOMER_ID}/agent-configuration",
         headers=admin,

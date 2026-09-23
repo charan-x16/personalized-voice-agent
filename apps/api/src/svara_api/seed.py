@@ -20,6 +20,7 @@ from .models import (
     Tenant,
     User,
 )
+from .services.tool_catalog import provision_default_tool_catalog
 
 DEMO_TENANT_ID = "00000000-0000-4000-8000-000000000001"
 DEMO_CUSTOMER_ID = "00000000-0000-4000-8000-000000000002"
@@ -27,7 +28,7 @@ DEMO_USER_ID = "00000000-0000-4000-8000-000000000003"
 DEMO_ORDER_ID = "00000000-0000-4000-8000-000000000004"
 DEMO_EMAIL = "rahul@example.com"
 DEMO_ADMIN_USER_ID = "00000000-0000-4000-8000-000000000005"
-DEMO_ADMIN_EMAIL = "ananya@acme.example"
+DEMO_ADMIN_EMAIL = "ananya@example.com"
 OWNER_CUSTOMER_ID = "00000000-0000-4000-8000-000000000030"
 OWNER_USER_ID = "00000000-0000-4000-8000-000000000031"
 OWNER_CUSTOMER_REF = "CUS-1500"
@@ -307,6 +308,16 @@ async def seed_demo_data(
                 )
             )
     await session.flush()
+
+    await provision_default_tool_catalog(
+        session,
+        tenant_id=tenant.id,
+        actor_user_id=DEMO_ADMIN_USER_ID,
+        actor_display_name="Ananya Rao",
+        customer_ids=tuple(
+            customer.id for customer in customers_by_ref.values() if customer.is_active
+        ),
+    )
 
     reservation_policy = await session.get(ReservationPolicy, tenant.id)
     if reservation_policy is None:

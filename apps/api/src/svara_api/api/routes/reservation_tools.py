@@ -38,6 +38,7 @@ from ...schemas import (
 from ...security import require_voice_tool_key
 from .sarvam import (
     _bind_interaction,
+    _ensure_session_allows_mutation,
     _ensure_session_is_usable,
     _load_voice_session,
     _record_successful_tool_call,
@@ -342,6 +343,7 @@ async def create_reservation(
     started_at = perf_counter()
     voice_session = await _load_voice_session(db, payload.conversation_ref, lock=True)
     _ensure_session_is_usable(voice_session)
+    _ensure_session_allows_mutation(voice_session)
     _bind_interaction(voice_session, payload.interaction_id)
     policy = await _load_policy(db, voice_session.tenant_id)
     if payload.party_size > policy.max_party_size:
@@ -499,6 +501,7 @@ async def reschedule_reservation(
     started_at = perf_counter()
     voice_session = await _load_voice_session(db, payload.conversation_ref, lock=True)
     _ensure_session_is_usable(voice_session)
+    _ensure_session_allows_mutation(voice_session)
     _bind_interaction(voice_session, payload.interaction_id)
     policy = await _load_policy(db, voice_session.tenant_id)
     new_start_at, new_end_at = _validate_start(policy, payload.new_start_at, now=utc_now())
@@ -592,6 +595,7 @@ async def cancel_reservation(
     started_at = perf_counter()
     voice_session = await _load_voice_session(db, payload.conversation_ref, lock=True)
     _ensure_session_is_usable(voice_session)
+    _ensure_session_allows_mutation(voice_session)
     _bind_interaction(voice_session, payload.interaction_id)
     policy = await _load_policy(db, voice_session.tenant_id)
     fingerprint = _request_fingerprint(
