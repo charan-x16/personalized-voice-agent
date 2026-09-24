@@ -5,10 +5,20 @@ import secrets
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ...agent_configuration import (
     DEFAULT_AGENT_DISPLAY_NAME,
@@ -77,6 +87,32 @@ _CUSTOMER_CREATED_AUDIT_ACTION = "customer.created"
 _ACCESS_REVOKED_AUDIT_ACTION = "customer.access_revoked"
 _ACCESS_RESTORED_AUDIT_ACTION = "customer.access_restored"
 _INLINE_OUTBOX_WORKER_ID = "api-inline"
+_BACKGROUND_OUTBOX_WORKER_ID = "api-background"
+
+
+async def _process_invitation_job_after_response(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    job_id: str,
+    provider: InvitationProvider,
+    settings: Settings,
+) -> None:
+    """Best-effort one durable invitation job without delaying the API response."""
+
+    try:
+        async with session_factory() as session:
+            await process_invitation_job(
+                session,
+                job_id=job_id,
+                worker_id=f"{_BACKGROUND_OUTBOX_WORKER_ID}:{job_id[-24:]}",
+                provider=provider,
+                settings=settings,
+            )
+    except Exception:  # pragma: no cover - defensive boundary around background work
+        logger.exception(
+            "Unexpected failure while processing Clerk invitation job",
+            extra={"job_id": job_id},
+        )
 
 
 def _utc_datetime(value: datetime) -> datetime:
@@ -371,7 +407,9 @@ async def _customer_detail_response(
 @router.post("", response_model=CustomerDetailResponse, status_code=status.HTTP_201_CREATED)
 async def create_customer(
     payload: CustomerCreateRequest,
+    request: Request,
     response: Response,
+    background_tasks: BackgroundTasks,
     actor: Annotated[Actor, Depends(require_tenant_admin)],
     db_session: Annotated[AsyncSession, Depends(get_db)],
     invitation_provider: Annotated[InvitationProvider, Depends(get_invitation_provider)],
@@ -480,17 +518,16 @@ async def create_customer(
             detail="Unable to create customer.",
         ) from exc
 
-    invitation_result = await process_invitation_job(
-        db_session,
+    detail = await _customer_detail_response(db_session, customer=customer)
+    background_tasks.add_task(
+        _process_invitation_job_after_response,
+        request.app.state.database.session_factory,
         job_id=invitation_job.id,
-        worker_id=_INLINE_OUTBOX_WORKER_ID,
         provider=invitation_provider,
         settings=settings,
     )
-    if invitation_result.retry_after_seconds is not None:
-        response.headers["Retry-After"] = str(invitation_result.retry_after_seconds)
     response.headers["Cache-Control"] = "no-store"
-    return await _customer_detail_response(db_session, customer=customer)
+    return detail
 
 
 @router.get("", response_model=CustomerListResponse)

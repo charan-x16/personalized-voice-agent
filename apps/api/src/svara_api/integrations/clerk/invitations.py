@@ -110,7 +110,11 @@ class ClerkInvitationProvider:
                         email_address=email,
                         redirect_url=self._redirect_url,
                         notify=True,
-                        ignore_existing=False,
+                        # Existing Clerk users still need an application invitation
+                        # so they receive the workspace entry link. Clerk documents
+                        # this flag as the supported way to invite an address that is
+                        # already registered in the same application instance.
+                        ignore_existing=True,
                         expires_in_days=self._expiry_days,
                     )
                 )

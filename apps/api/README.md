@@ -313,7 +313,7 @@ Run the durable Clerk job processor as a separate service from the same image. `
 uv run python scripts/process_invitation_outbox.py --watch
 ```
 
-The API makes one immediate best-effort attempt after committing each job, so local development does not require the worker when Clerk is healthy. Production must run the worker and monitor `pending` and `dead_letter` rows.
+Customer creation schedules one best-effort invitation attempt after the HTTP response has been sent, so a slow Clerk request cannot turn a committed customer creation into an apparent frontend failure. Production must still run the durable worker and monitor `pending` and `dead_letter` rows; the in-process attempt is only a latency optimization and is not a delivery guarantee.
 
 ## Configuration
 
