@@ -9,8 +9,8 @@ from sqlalchemy import select
 
 from svara_api.config import Settings
 from svara_api.database import Database
+from svara_api.domains.tools.catalog import provision_default_tool_catalog
 from svara_api.models import Customer, Tenant, User
-from svara_api.services.tool_catalog import provision_default_tool_catalog
 
 
 def arguments() -> argparse.Namespace:

@@ -68,10 +68,19 @@ Browser application code never receives the FastAPI bearer token or selects a `t
 ## Repository layout
 
 ```text
-src/                 Next.js frontend
-apps/api/            FastAPI backend
-compose.yaml         Local PostgreSQL service
+apps/web/             Next.js frontend and same-origin BFF
+apps/api/             FastAPI backend and migrations
+packages/api-contract Generated OpenAPI contract
+infrastructure/       Deployment topology and operational notes
+docs/                 Architecture, security, and integration guides
+compose.yaml          Local PostgreSQL service
 ```
+
+The backend is a modular monolith: business capabilities live under
+`apps/api/src/svara_api/domains`, while Clerk and Sarvam adapters live under
+`apps/api/src/svara_api/integrations`. See the
+[architecture guide](docs/architecture.md) for dependency rules and the full
+request flow.
 
 ## Run locally
 
@@ -79,9 +88,10 @@ Prerequisites: Node.js 22.15 or newer, pnpm 11, Python 3.11 or newer, and `uv`.
 Docker is optional for running the local PostgreSQL service.
 
 The project uses exactly two untracked runtime environment files:
-`.env.local` for Next.js and `apps/api/.env` for FastAPI. Their tracked,
-credential-free templates are `.env.example` and `apps/api/.env.example`.
-Do not copy database or Sarvam secrets into the root Next.js environment file,
+`apps/web/.env.local` for Next.js and `apps/api/.env` for FastAPI. Their tracked,
+credential-free templates are `apps/web/.env.example` and
+`apps/api/.env.example`. Do not copy database or Sarvam secrets into the
+Next.js environment file,
 and never expose `CLERK_SECRET_KEY` through a `NEXT_PUBLIC_` name.
 
 ### 1. Start the API
@@ -105,7 +115,8 @@ The default backend configuration creates `apps/api/svara.db` and idempotently s
 
 ### 2. Start the frontend
 
-From the repository root, set the server-only backend address in `.env.local`:
+From the repository root, set the server-only backend address in
+`apps/web/.env.local`:
 
 ```text
 API_BASE_URL=http://127.0.0.1:8000
@@ -126,7 +137,7 @@ pnpm install
 pnpm dev
 ```
 
-The preferred setup is `clerk init --app app_3J2EY1ljMXFFTN6tlNCp7eU1wJu`, followed by `clerk env pull --file .env.local` and `clerk env pull --file apps/api/.env`. The backend needs `CLERK_SECRET_KEY`; it is never sent to the browser. Open [http://localhost:3000](http://localhost:3000) and create the first test account from the navigation. In a Clerk development instance, `rahul+clerk_test@example.com` links to the seeded `rahul@example.com` customer and can be verified with code `424242`. Use `ananya+clerk_test@example.com` for the seeded administrator.
+The preferred setup is `clerk init --app app_3J2EY1ljMXFFTN6tlNCp7eU1wJu`, followed by `clerk env pull --file apps/web/.env.local` and `clerk env pull --file apps/api/.env`. The backend needs `CLERK_SECRET_KEY`; it is never sent to the browser. Open [http://localhost:3000](http://localhost:3000) and create the first test account from the navigation. In a Clerk development instance, `rahul+clerk_test@example.com` links to the seeded `rahul@example.com` customer and can be verified with code `424242`. Use `ananya+clerk_test@example.com` for the seeded administrator.
 
 To use PostgreSQL instead, run `docker compose up -d postgres` from the repository root and set:
 
@@ -214,9 +225,15 @@ Backend:
 
 ```bash
 cd apps/api
-uv run ruff check src tests
-uv run ruff format --check src tests
+uv run ruff check src tests scripts
+uv run ruff format --check src tests scripts
 uv run pytest
+```
+
+Generated contract:
+
+```bash
+pnpm api:check-openapi
 ```
 
 ## Production gaps

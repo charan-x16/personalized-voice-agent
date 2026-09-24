@@ -1,0 +1,4064 @@
+{
+  "components": {
+    "schemas": {
+      "AdminAuditEventResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "customer.profile_updated",
+              "customer.agent_configuration_updated",
+              "customer.created",
+              "customer.access_invitation_sent",
+              "customer.access_invitation_failed",
+              "customer.access_revoked",
+              "customer.access_restored"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "actor_display_name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actor Display Name",
+            "type": "string"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Fields",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "changed_fields",
+          "revision",
+          "actor_display_name",
+          "created_at"
+        ],
+        "title": "AdminAuditEventResponse",
+        "type": "object"
+      },
+      "AgentConfigurationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "instructions": {
+            "title": "Instructions",
+            "type": "string"
+          },
+          "opening_message": {
+            "title": "Opening Message",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "tone": {
+            "enum": [
+              "warm",
+              "professional",
+              "concise"
+            ],
+            "title": "Tone",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "display_name",
+          "opening_message",
+          "tone",
+          "instructions",
+          "revision",
+          "updated_at"
+        ],
+        "title": "AgentConfigurationResponse",
+        "type": "object"
+      },
+      "AgentConfigurationUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "opening_message": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opening Message"
+          },
+          "tone": {
+            "anyOf": [
+              {
+                "enum": [
+                  "warm",
+                  "professional",
+                  "concise"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "AgentConfigurationUpdateRequest",
+        "type": "object"
+      },
+      "AvailabilitySlot": {
+        "additionalProperties": false,
+        "properties": {
+          "display_time": {
+            "title": "Display Time",
+            "type": "string"
+          },
+          "end_at": {
+            "format": "date-time",
+            "title": "End At",
+            "type": "string"
+          },
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_at",
+          "end_at",
+          "display_time"
+        ],
+        "title": "AvailabilitySlot",
+        "type": "object"
+      },
+      "CancelReservationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_ref": {
+            "maxLength": 256,
+            "minLength": 24,
+            "title": "Conversation Ref",
+            "type": "string"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "interaction_id": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interaction Id"
+          },
+          "reservation_reference": {
+            "maxLength": 24,
+            "minLength": 5,
+            "title": "Reservation Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_ref",
+          "reservation_reference",
+          "expected_version"
+        ],
+        "title": "CancelReservationRequest",
+        "type": "object"
+      },
+      "CheckAvailabilityRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_ref": {
+            "maxLength": 256,
+            "minLength": 24,
+            "title": "Conversation Ref",
+            "type": "string"
+          },
+          "interaction_id": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interaction Id"
+          },
+          "party_size": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Party Size",
+            "type": "integer"
+          },
+          "preferred_time": {
+            "format": "time",
+            "title": "Preferred Time",
+            "type": "string"
+          },
+          "reservation_date": {
+            "format": "date",
+            "title": "Reservation Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_ref",
+          "reservation_date",
+          "preferred_time",
+          "party_size"
+        ],
+        "title": "CheckAvailabilityRequest",
+        "type": "object"
+      },
+      "CheckAvailabilityResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "party_size": {
+            "title": "Party Size",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "service_location": {
+            "title": "Service Location",
+            "type": "string"
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/AvailabilitySlot"
+            },
+            "maxItems": 5,
+            "title": "Slots",
+            "type": "array"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "service_location",
+          "timezone",
+          "party_size",
+          "slots"
+        ],
+        "title": "CheckAvailabilityResponse",
+        "type": "object"
+      },
+      "ConversationDetailResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "duration_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Seconds"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "final_variables": {
+            "additionalProperties": true,
+            "title": "Final Variables",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "transcript": {
+            "items": {
+              "$ref": "#/components/schemas/TranscriptTurn"
+            },
+            "title": "Transcript",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "started_at",
+          "ended_at",
+          "duration_seconds",
+          "language",
+          "resolution",
+          "summary",
+          "transcript",
+          "final_variables"
+        ],
+        "title": "ConversationDetailResponse",
+        "type": "object"
+      },
+      "ConversationListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationSummaryResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ConversationListResponse",
+        "type": "object"
+      },
+      "ConversationSummaryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "duration_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Seconds"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "started_at",
+          "ended_at",
+          "duration_seconds",
+          "language",
+          "resolution",
+          "summary"
+        ],
+        "title": "ConversationSummaryResponse",
+        "type": "object"
+      },
+      "CreateReservationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_ref": {
+            "maxLength": 256,
+            "minLength": 24,
+            "title": "Conversation Ref",
+            "type": "string"
+          },
+          "guest_name": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guest Name"
+          },
+          "interaction_id": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interaction Id"
+          },
+          "party_size": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Party Size",
+            "type": "integer"
+          },
+          "special_requests": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Special Requests"
+          },
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_ref",
+          "start_at",
+          "party_size"
+        ],
+        "title": "CreateReservationRequest",
+        "type": "object"
+      },
+      "CustomerAccessResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "invited_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invited At"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "not_invited",
+              "queued",
+              "pending",
+              "accepted",
+              "revoked",
+              "expired",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "status",
+          "is_active",
+          "invited_at",
+          "expires_at",
+          "accepted_at"
+        ],
+        "title": "CustomerAccessResponse",
+        "type": "object"
+      },
+      "CustomerContext": {
+        "additionalProperties": false,
+        "properties": {
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "open_request_count": {
+            "minimum": 0.0,
+            "title": "Open Request Count",
+            "type": "integer"
+          },
+          "plan_name": {
+            "title": "Plan Name",
+            "type": "string"
+          },
+          "preferred_language": {
+            "title": "Preferred Language",
+            "type": "string"
+          }
+        },
+        "required": [
+          "first_name",
+          "preferred_language",
+          "plan_name",
+          "open_request_count"
+        ],
+        "title": "CustomerContext",
+        "type": "object"
+      },
+      "CustomerCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "external_ref": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Ref"
+          },
+          "full_name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Full Name",
+            "type": "string"
+          },
+          "plan_name": {
+            "default": "Essential",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Plan Name",
+            "type": "string"
+          },
+          "preferred_language": {
+            "default": "English",
+            "maxLength": 40,
+            "minLength": 2,
+            "title": "Preferred Language",
+            "type": "string"
+          }
+        },
+        "required": [
+          "full_name",
+          "email"
+        ],
+        "title": "CustomerCreateRequest",
+        "type": "object"
+      },
+      "CustomerDetailResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "access": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CustomerAccessResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "agent_configuration": {
+            "$ref": "#/components/schemas/AgentConfigurationResponse"
+          },
+          "conversation_count": {
+            "minimum": 0.0,
+            "title": "Conversation Count",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "external_ref": {
+            "title": "External Ref",
+            "type": "string"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "initials": {
+            "title": "Initials",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "last_conversation_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Conversation At"
+          },
+          "open_order_count": {
+            "minimum": 0.0,
+            "title": "Open Order Count",
+            "type": "integer"
+          },
+          "plan_name": {
+            "title": "Plan Name",
+            "type": "string"
+          },
+          "preferred_language": {
+            "title": "Preferred Language",
+            "type": "string"
+          },
+          "profile_revision": {
+            "minimum": 1.0,
+            "title": "Profile Revision",
+            "type": "integer"
+          },
+          "recent_audit_events": {
+            "items": {
+              "$ref": "#/components/schemas/AdminAuditEventResponse"
+            },
+            "title": "Recent Audit Events",
+            "type": "array"
+          },
+          "recent_conversations": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationSummaryResponse"
+            },
+            "title": "Recent Conversations",
+            "type": "array"
+          },
+          "resolved_conversation_count": {
+            "minimum": 0.0,
+            "title": "Resolved Conversation Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "external_ref",
+          "full_name",
+          "initials",
+          "preferred_language",
+          "plan_name",
+          "is_active",
+          "created_at",
+          "conversation_count",
+          "resolved_conversation_count",
+          "last_conversation_at",
+          "email",
+          "access",
+          "open_order_count",
+          "profile_revision",
+          "agent_configuration",
+          "recent_conversations",
+          "recent_audit_events"
+        ],
+        "title": "CustomerDetailResponse",
+        "type": "object"
+      },
+      "CustomerListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerSummaryResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "CustomerListResponse",
+        "type": "object"
+      },
+      "CustomerSummaryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_count": {
+            "minimum": 0.0,
+            "title": "Conversation Count",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "external_ref": {
+            "title": "External Ref",
+            "type": "string"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "initials": {
+            "title": "Initials",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "last_conversation_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Conversation At"
+          },
+          "plan_name": {
+            "title": "Plan Name",
+            "type": "string"
+          },
+          "preferred_language": {
+            "title": "Preferred Language",
+            "type": "string"
+          },
+          "resolved_conversation_count": {
+            "minimum": 0.0,
+            "title": "Resolved Conversation Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "external_ref",
+          "full_name",
+          "initials",
+          "preferred_language",
+          "plan_name",
+          "is_active",
+          "created_at",
+          "conversation_count",
+          "resolved_conversation_count",
+          "last_conversation_at"
+        ],
+        "title": "CustomerSummaryResponse",
+        "type": "object"
+      },
+      "CustomerUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "plan_name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Name"
+          },
+          "preferred_language": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Language"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "CustomerUpdateRequest",
+        "type": "object"
+      },
+      "CustomerVoiceToolListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerVoiceToolResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "customer_id",
+          "items"
+        ],
+        "title": "CustomerVoiceToolListResponse",
+        "type": "object"
+      },
+      "CustomerVoiceToolResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assigned": {
+            "title": "Assigned",
+            "type": "boolean"
+          },
+          "is_enabled": {
+            "title": "Is Enabled",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "tool": {
+            "$ref": "#/components/schemas/VoiceToolDefinitionResponse"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "tool",
+          "assigned",
+          "is_enabled",
+          "updated_at"
+        ],
+        "title": "CustomerVoiceToolResponse",
+        "type": "object"
+      },
+      "CustomerVoiceToolUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
+          },
+          "is_enabled": {
+            "title": "Is Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "is_enabled"
+        ],
+        "title": "CustomerVoiceToolUpdateRequest",
+        "type": "object"
+      },
+      "DemoLoginRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "default": "rahul@example.com",
+            "maxLength": 254,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "title": "DemoLoginRequest",
+        "type": "object"
+      },
+      "FindReservationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_ref": {
+            "maxLength": 256,
+            "minLength": 24,
+            "title": "Conversation Ref",
+            "type": "string"
+          },
+          "interaction_id": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interaction Id"
+          },
+          "reservation_reference": {
+            "anyOf": [
+              {
+                "maxLength": 24,
+                "minLength": 5,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reservation Reference"
+          }
+        },
+        "required": [
+          "conversation_ref"
+        ],
+        "title": "FindReservationRequest",
+        "type": "object"
+      },
+      "FindReservationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "found": {
+            "title": "Found",
+            "type": "boolean"
+          },
+          "reservations": {
+            "items": {
+              "$ref": "#/components/schemas/ReservationDetails"
+            },
+            "maxItems": 5,
+            "title": "Reservations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "found",
+          "reservations"
+        ],
+        "title": "FindReservationResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "MeResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Name"
+          },
+          "agent_opening_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Opening Message"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "initials": {
+            "title": "Initials",
+            "type": "string"
+          },
+          "plan_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Name"
+          },
+          "preferred_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Language"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          },
+          "voice_mode": {
+            "default": "mock",
+            "enum": [
+              "mock",
+              "sarvam"
+            ],
+            "title": "Voice Mode",
+            "type": "string"
+          },
+          "workspace_name": {
+            "title": "Workspace Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "customer_id",
+          "role",
+          "full_name",
+          "first_name",
+          "initials",
+          "email",
+          "workspace_name",
+          "preferred_language",
+          "plan_name"
+        ],
+        "title": "MeResponse",
+        "type": "object"
+      },
+      "MockConversationCompleteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "duration_seconds": {
+            "anyOf": [
+              {
+                "maximum": 86400.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Seconds"
+          },
+          "resolution": {
+            "default": "completed",
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Resolution",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "transcript": {
+            "items": {
+              "$ref": "#/components/schemas/TranscriptTurn"
+            },
+            "maxItems": 500,
+            "title": "Transcript",
+            "type": "array"
+          }
+        },
+        "title": "MockConversationCompleteRequest",
+        "type": "object"
+      },
+      "OnEndRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_ref": {
+            "maxLength": 256,
+            "minLength": 24,
+            "title": "Conversation Ref",
+            "type": "string"
+          },
+          "duration_seconds": {
+            "anyOf": [
+              {
+                "maximum": 86400.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Seconds"
+          },
+          "final_variables": {
+            "additionalProperties": true,
+            "title": "Final Variables",
+            "type": "object"
+          },
+          "interaction_id": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interaction Id"
+          },
+          "resolution": {
+            "default": "unknown",
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Resolution",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "transcript": {
+            "items": {
+              "$ref": "#/components/schemas/TranscriptTurn"
+            },
+            "maxItems": 500,
+            "title": "Transcript",
+            "type": "array"
+          }
+        },
+        "required": [
+          "conversation_ref"
+        ],
+        "title": "OnEndRequest",
+        "type": "object"
+      },
+      "OnEndResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "idempotent": {
+            "title": "Idempotent",
+            "type": "boolean"
+          },
+          "outcome_id": {
+            "title": "Outcome Id",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "const": "recorded",
+            "default": "recorded",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "outcome_id",
+          "idempotent"
+        ],
+        "title": "OnEndResponse",
+        "type": "object"
+      },
+      "OnStartRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_ref": {
+            "maxLength": 256,
+            "minLength": 24,
+            "title": "Conversation Ref",
+            "type": "string"
+          },
+          "interaction_id": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interaction Id"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          }
+        },
+        "required": [
+          "conversation_ref"
+        ],
+        "title": "OnStartRequest",
+        "type": "object"
+      },
+      "OnStartResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/RuntimeAgentConfiguration"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/CustomerContext"
+          },
+          "safe_to_continue": {
+            "title": "Safe To Continue",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "customer",
+          "agent",
+          "safe_to_continue"
+        ],
+        "title": "OnStartResponse",
+        "type": "object"
+      },
+      "OrderStatusRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_ref": {
+            "maxLength": 256,
+            "minLength": 24,
+            "title": "Conversation Ref",
+            "type": "string"
+          },
+          "interaction_id": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interaction Id"
+          },
+          "order_reference": {
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Order Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_ref",
+          "order_reference"
+        ],
+        "title": "OrderStatusRequest",
+        "type": "object"
+      },
+      "OrderStatusResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "delivery_city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery City"
+          },
+          "estimated_arrival": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Arrival"
+          },
+          "order_reference": {
+            "title": "Order Reference",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_reference",
+          "status",
+          "estimated_arrival",
+          "delivery_city"
+        ],
+        "title": "OrderStatusResponse",
+        "type": "object"
+      },
+      "ProviderConnection": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "transport": {
+            "enum": [
+              "mock",
+              "websocket"
+            ],
+            "title": "Transport",
+            "type": "string"
+          },
+          "websocket_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Websocket Url"
+          }
+        },
+        "required": [
+          "transport",
+          "expires_at"
+        ],
+        "title": "ProviderConnection",
+        "type": "object"
+      },
+      "RescheduleReservationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_ref": {
+            "maxLength": 256,
+            "minLength": 24,
+            "title": "Conversation Ref",
+            "type": "string"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "interaction_id": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interaction Id"
+          },
+          "new_start_at": {
+            "format": "date-time",
+            "title": "New Start At",
+            "type": "string"
+          },
+          "reservation_reference": {
+            "maxLength": 24,
+            "minLength": 5,
+            "title": "Reservation Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "conversation_ref",
+          "reservation_reference",
+          "new_start_at",
+          "expected_version"
+        ],
+        "title": "RescheduleReservationRequest",
+        "type": "object"
+      },
+      "ReservationDetails": {
+        "additionalProperties": false,
+        "properties": {
+          "end_at": {
+            "format": "date-time",
+            "title": "End At",
+            "type": "string"
+          },
+          "guest_name": {
+            "title": "Guest Name",
+            "type": "string"
+          },
+          "party_size": {
+            "title": "Party Size",
+            "type": "integer"
+          },
+          "reservation_reference": {
+            "title": "Reservation Reference",
+            "type": "string"
+          },
+          "service_location": {
+            "title": "Service Location",
+            "type": "string"
+          },
+          "special_requests": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Special Requests"
+          },
+          "start_at": {
+            "format": "date-time",
+            "title": "Start At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "confirmed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reservation_reference",
+          "status",
+          "guest_name",
+          "party_size",
+          "start_at",
+          "end_at",
+          "service_location",
+          "timezone",
+          "special_requests",
+          "version"
+        ],
+        "title": "ReservationDetails",
+        "type": "object"
+      },
+      "ReservationMutationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "idempotent": {
+            "title": "Idempotent",
+            "type": "boolean"
+          },
+          "reservation": {
+            "$ref": "#/components/schemas/ReservationDetails"
+          }
+        },
+        "required": [
+          "reservation",
+          "idempotent"
+        ],
+        "title": "ReservationMutationResponse",
+        "type": "object"
+      },
+      "RuntimeAgentConfiguration": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "instructions": {
+            "title": "Instructions",
+            "type": "string"
+          },
+          "opening_message": {
+            "maxLength": 500,
+            "title": "Opening Message",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "tone": {
+            "enum": [
+              "warm",
+              "professional",
+              "concise"
+            ],
+            "title": "Tone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "display_name",
+          "opening_message",
+          "tone",
+          "instructions",
+          "revision"
+        ],
+        "title": "RuntimeAgentConfiguration",
+        "type": "object"
+      },
+      "TokenResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "token_type": {
+            "const": "bearer",
+            "default": "bearer",
+            "title": "Token Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token",
+          "expires_in"
+        ],
+        "title": "TokenResponse",
+        "type": "object"
+      },
+      "TranscriptTurn": {
+        "additionalProperties": false,
+        "properties": {
+          "speaker": {
+            "enum": [
+              "agent",
+              "customer",
+              "tool"
+            ],
+            "title": "Speaker",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          }
+        },
+        "required": [
+          "speaker",
+          "text"
+        ],
+        "title": "TranscriptTurn",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "VoiceSessionCancelResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "idempotent": {
+            "title": "Idempotent",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "cancelling",
+              "cancelled",
+              "completed",
+              "ended",
+              "expired",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "status",
+          "idempotent"
+        ],
+        "title": "VoiceSessionCancelResponse",
+        "type": "object"
+      },
+      "VoiceSessionCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "language": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          }
+        },
+        "title": "VoiceSessionCreateRequest",
+        "type": "object"
+      },
+      "VoiceSessionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "connection": {
+            "$ref": "#/components/schemas/ProviderConnection"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "provider",
+          "status",
+          "language",
+          "expires_at",
+          "connection"
+        ],
+        "title": "VoiceSessionResponse",
+        "type": "object"
+      },
+      "VoiceToolAdminEventResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "voice_tool.created",
+              "voice_tool.updated",
+              "customer_voice_tool.updated"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "actor_display_name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Actor Display Name",
+            "type": "string"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Fields",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "customer_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Reference"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "tool_display_name": {
+            "title": "Tool Display Name",
+            "type": "string"
+          },
+          "tool_id": {
+            "title": "Tool Id",
+            "type": "string"
+          },
+          "tool_key": {
+            "title": "Tool Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "tool_id",
+          "tool_key",
+          "tool_display_name",
+          "customer_id",
+          "customer_reference",
+          "changed_fields",
+          "revision",
+          "actor_display_name",
+          "created_at"
+        ],
+        "title": "VoiceToolAdminEventResponse",
+        "type": "object"
+      },
+      "VoiceToolCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "capability": {
+            "enum": [
+              "customer_profile",
+              "order_status",
+              "reservation_availability",
+              "reservation_lookup",
+              "reservation_create",
+              "reservation_reschedule",
+              "reservation_cancel"
+            ],
+            "title": "Capability",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "display_name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "is_enabled": {
+            "default": true,
+            "title": "Is Enabled",
+            "type": "boolean"
+          },
+          "tool_key": {
+            "maxLength": 80,
+            "minLength": 3,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Tool Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool_key",
+          "display_name",
+          "description",
+          "capability"
+        ],
+        "title": "VoiceToolCreateRequest",
+        "type": "object"
+      },
+      "VoiceToolDefinitionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "assigned_customer_count": {
+            "minimum": 0.0,
+            "title": "Assigned Customer Count",
+            "type": "integer"
+          },
+          "capability": {
+            "enum": [
+              "customer_profile",
+              "order_status",
+              "reservation_availability",
+              "reservation_lookup",
+              "reservation_create",
+              "reservation_reschedule",
+              "reservation_cancel"
+            ],
+            "title": "Capability",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "is_enabled": {
+            "title": "Is Enabled",
+            "type": "boolean"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "tool_key": {
+            "title": "Tool Key",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tool_key",
+          "display_name",
+          "description",
+          "capability",
+          "is_enabled",
+          "revision",
+          "assigned_customer_count",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "VoiceToolDefinitionResponse",
+        "type": "object"
+      },
+      "VoiceToolExecuteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "conversation_ref": {
+            "maxLength": 256,
+            "minLength": 24,
+            "title": "Conversation Ref",
+            "type": "string"
+          },
+          "interaction_id": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interaction Id"
+          }
+        },
+        "required": [
+          "conversation_ref"
+        ],
+        "title": "VoiceToolExecuteRequest",
+        "type": "object"
+      },
+      "VoiceToolListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VoiceToolDefinitionResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "recent_events": {
+            "items": {
+              "$ref": "#/components/schemas/VoiceToolAdminEventResponse"
+            },
+            "title": "Recent Events",
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "recent_events"
+        ],
+        "title": "VoiceToolListResponse",
+        "type": "object"
+      },
+      "VoiceToolUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "is_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Enabled"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "VoiceToolUpdateRequest",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Tenant-safe session and tool gateway for personalized voice agents.",
+    "title": "Svara API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/v1/auth/demo-login": {
+      "post": {
+        "description": "Issue a short-lived token for an active seeded user in demo environments.",
+        "operationId": "demo_login_v1_auth_demo_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create a demo session",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/v1/conversations": {
+      "get": {
+        "description": "List only voice sessions belonging to the authenticated customer.",
+        "operationId": "list_conversations_v1_conversations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 10000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "query",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Query",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "outcome",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "resolved",
+                "follow-up",
+                "escalated"
+              ],
+              "title": "Outcome",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Conversations",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/v1/conversations/{session_id}": {
+      "get": {
+        "description": "Return one tenant- and customer-bound conversation without provider secrets.",
+        "operationId": "get_conversation_v1_conversations__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Conversation",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/v1/customers": {
+      "get": {
+        "description": "List customer profiles within the authenticated administrator's tenant.",
+        "operationId": "list_customers_v1_customers_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 160,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Query"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "active",
+                "inactive"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 10000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Customers",
+        "tags": [
+          "customer management"
+        ]
+      },
+      "post": {
+        "description": "Create a tenant customer and durably enqueue their Clerk invitation.",
+        "operationId": "create_customer_v1_customers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Customer",
+        "tags": [
+          "customer management"
+        ]
+      }
+    },
+    "/v1/customers/{customer_id}": {
+      "get": {
+        "description": "Return one customer profile, scoped to the administrator's tenant.",
+        "operationId": "get_customer_v1_customers__customer_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Customer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Customer",
+        "tags": [
+          "customer management"
+        ]
+      },
+      "patch": {
+        "description": "Update the small, explicitly allowlisted set of editable customer fields.",
+        "operationId": "update_customer_v1_customers__customer_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Customer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Customer",
+        "tags": [
+          "customer management"
+        ]
+      }
+    },
+    "/v1/customers/{customer_id}/access/invitation": {
+      "post": {
+        "description": "Invite an unlinked customer or restore a previously linked account.",
+        "operationId": "grant_customer_access_v1_customers__customer_id__access_invitation_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Customer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Grant Customer Access",
+        "tags": [
+          "customer management"
+        ]
+      }
+    },
+    "/v1/customers/{customer_id}/access/revoke": {
+      "post": {
+        "description": "Revoke local access and invalidate a still-pending Clerk invitation.",
+        "operationId": "revoke_customer_access_v1_customers__customer_id__access_revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Customer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Customer Access",
+        "tags": [
+          "customer management"
+        ]
+      }
+    },
+    "/v1/customers/{customer_id}/agent-configuration": {
+      "patch": {
+        "description": "Update one tenant-scoped agent configuration with optimistic concurrency.",
+        "operationId": "update_customer_agent_configuration_v1_customers__customer_id__agent_configuration_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Customer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentConfigurationUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Customer Agent Configuration",
+        "tags": [
+          "customer management"
+        ]
+      }
+    },
+    "/v1/health": {
+      "get": {
+        "operationId": "health_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health V1 Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Service health",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/v1/me": {
+      "get": {
+        "description": "Return the authenticated user's minimum UI bootstrap profile.",
+        "operationId": "get_me_v1_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Me",
+        "tags": [
+          "customer profile"
+        ]
+      }
+    },
+    "/v1/sarvam/hooks/on-end": {
+      "post": {
+        "operationId": "on_end_v1_sarvam_hooks_on_end_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Voice-Tool-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Voice-Tool-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnEndRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnEndResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "On End",
+        "tags": [
+          "Sarvam tools and hooks"
+        ]
+      }
+    },
+    "/v1/sarvam/hooks/on-start": {
+      "post": {
+        "operationId": "on_start_v1_sarvam_hooks_on_start_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Voice-Tool-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Voice-Tool-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnStartResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "On Start",
+        "tags": [
+          "Sarvam tools and hooks"
+        ]
+      }
+    },
+    "/v1/sarvam/tools/cancel-reservation": {
+      "post": {
+        "operationId": "cancel_reservation_v1_sarvam_tools_cancel_reservation_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Voice-Tool-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Voice-Tool-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelReservationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationMutationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Reservation",
+        "tags": [
+          "Sarvam reservation tools"
+        ]
+      }
+    },
+    "/v1/sarvam/tools/check-availability": {
+      "post": {
+        "operationId": "check_availability_v1_sarvam_tools_check_availability_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Voice-Tool-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Voice-Tool-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckAvailabilityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckAvailabilityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Availability",
+        "tags": [
+          "Sarvam reservation tools"
+        ]
+      }
+    },
+    "/v1/sarvam/tools/create-reservation": {
+      "post": {
+        "operationId": "create_reservation_v1_sarvam_tools_create_reservation_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Voice-Tool-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Voice-Tool-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReservationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationMutationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Reservation",
+        "tags": [
+          "Sarvam reservation tools"
+        ]
+      }
+    },
+    "/v1/sarvam/tools/execute/{tool_key}": {
+      "post": {
+        "operationId": "execute_voice_tool_v1_sarvam_tools_execute__tool_key__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tool_key",
+            "required": true,
+            "schema": {
+              "maxLength": 80,
+              "minLength": 3,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "title": "Tool Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Voice-Tool-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Voice-Tool-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceToolExecuteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Execute Voice Tool V1 Sarvam Tools Execute  Tool Key  Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Execute Voice Tool",
+        "tags": [
+          "Sarvam custom tools"
+        ]
+      }
+    },
+    "/v1/sarvam/tools/find-reservation": {
+      "post": {
+        "operationId": "find_reservation_v1_sarvam_tools_find_reservation_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Voice-Tool-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Voice-Tool-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FindReservationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindReservationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Find Reservation",
+        "tags": [
+          "Sarvam reservation tools"
+        ]
+      }
+    },
+    "/v1/sarvam/tools/get-order-status": {
+      "post": {
+        "operationId": "get_order_status_v1_sarvam_tools_get_order_status_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Voice-Tool-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Voice-Tool-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Order Status",
+        "tags": [
+          "Sarvam tools and hooks"
+        ]
+      }
+    },
+    "/v1/sarvam/tools/reschedule-reservation": {
+      "post": {
+        "operationId": "reschedule_reservation_v1_sarvam_tools_reschedule_reservation_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Voice-Tool-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Voice-Tool-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleReservationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationMutationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reschedule Reservation",
+        "tags": [
+          "Sarvam reservation tools"
+        ]
+      }
+    },
+    "/v1/tools": {
+      "get": {
+        "operationId": "list_voice_tools_v1_tools_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceToolListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Voice Tools",
+        "tags": [
+          "voice tool management"
+        ]
+      },
+      "post": {
+        "operationId": "create_voice_tool_v1_tools_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceToolCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceToolDefinitionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Voice Tool",
+        "tags": [
+          "voice tool management"
+        ]
+      }
+    },
+    "/v1/tools/customer-assignments/{customer_id}": {
+      "get": {
+        "operationId": "list_customer_voice_tools_v1_tools_customer_assignments__customer_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Customer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerVoiceToolListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Customer Voice Tools",
+        "tags": [
+          "voice tool management"
+        ]
+      }
+    },
+    "/v1/tools/customer-assignments/{customer_id}/{tool_id}": {
+      "patch": {
+        "operationId": "update_customer_voice_tool_v1_tools_customer_assignments__customer_id___tool_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Customer Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tool_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Tool Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerVoiceToolUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerVoiceToolResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Customer Voice Tool",
+        "tags": [
+          "voice tool management"
+        ]
+      }
+    },
+    "/v1/tools/{tool_id}": {
+      "patch": {
+        "operationId": "update_voice_tool_v1_tools__tool_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tool_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Tool Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceToolUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceToolDefinitionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Voice Tool",
+        "tags": [
+          "voice tool management"
+        ]
+      }
+    },
+    "/v1/voice/customers/{customer_id}/preview-sessions": {
+      "post": {
+        "description": "Preview one tenant-scoped customer agent without impersonating the customer.",
+        "operationId": "create_admin_preview_session_v1_voice_customers__customer_id__preview_sessions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Customer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceSessionCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceSessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Admin Preview Session",
+        "tags": [
+          "voice sessions"
+        ]
+      }
+    },
+    "/v1/voice/sessions": {
+      "post": {
+        "description": "Start a voice session for the authenticated actor's own customer profile.",
+        "operationId": "create_voice_session_v1_voice_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceSessionCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceSessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Voice Session",
+        "tags": [
+          "voice sessions"
+        ]
+      }
+    },
+    "/v1/voice/sessions/{session_id}/cancel": {
+      "post": {
+        "description": "Stop the actor's own provider session without trusting provider identifiers.",
+        "operationId": "cancel_voice_session_v1_voice_sessions__session_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceSessionCancelResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cancel Voice Session",
+        "tags": [
+          "voice sessions"
+        ]
+      }
+    },
+    "/v1/voice/sessions/{session_id}/mock-complete": {
+      "post": {
+        "description": "Finish a mock call so the browser can exercise the complete local flow.",
+        "operationId": "mock_complete_voice_session_v1_voice_sessions__session_id__mock_complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MockConversationCompleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mock Complete Voice Session",
+        "tags": [
+          "voice sessions"
+        ]
+      }
+    },
+    "/v1/webhooks/clerk": {
+      "post": {
+        "description": "Verify and idempotently reconcile supported Clerk user events.",
+        "operationId": "clerk_webhook_v1_webhooks_clerk_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Clerk Webhook V1 Webhooks Clerk Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Clerk Webhook",
+        "tags": [
+          "webhooks"
+        ]
+      }
+    }
+  }
+}

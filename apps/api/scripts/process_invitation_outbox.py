@@ -7,8 +7,8 @@ import socket
 
 from svara_api.config import get_settings
 from svara_api.database import Database
-from svara_api.services.clerk_invitations import build_invitation_provider
-from svara_api.services.invitation_outbox import process_ready_invitation_jobs
+from svara_api.integrations.clerk.invitations import build_invitation_provider
+from svara_api.integrations.clerk.outbox import process_ready_invitation_jobs
 
 
 def _arguments() -> argparse.Namespace:
