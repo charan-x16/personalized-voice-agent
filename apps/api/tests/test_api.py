@@ -35,8 +35,10 @@ from svara_api.agent_configuration import (
 from svara_api.config import Settings
 from svara_api.database import Database, get_db
 from svara_api.domains.voice import router as voice_routes
+from svara_api.integrations.clerk import invitations as clerk_invitations
 from svara_api.integrations.clerk.invitations import (
     AccessInvitation,
+    ClerkInvitationProvider,
     InvitationProviderError,
 )
 from svara_api.integrations.clerk.outbox import process_ready_invitation_jobs
@@ -103,6 +105,49 @@ class StubInvitationProvider:
         self.calls.append(("revoke", invitation_id))
         if self.fail_revoke:
             raise InvitationProviderError(retry_after_seconds=23)
+
+
+def test_clerk_invitation_allows_an_existing_application_user(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_request: dict[str, object] = {}
+
+    class FakeInvitations:
+        async def create_async(self, *, request: object) -> object:
+            captured_request["value"] = request
+            now_ms = int(datetime.now(UTC).timestamp() * 1_000)
+            return SimpleNamespace(
+                id="inv_existing_user",
+                created_at=now_ms,
+                expires_at=now_ms + 86_400_000,
+            )
+
+    class FakeClerk:
+        def __init__(self, **_: object) -> None:
+            self.invitations = FakeInvitations()
+
+        async def __aenter__(self) -> FakeClerk:
+            return self
+
+        async def __aexit__(self, *_: object) -> None:
+            return None
+
+    monkeypatch.setattr(clerk_invitations, "Clerk", FakeClerk)
+    settings = Settings(
+        _env_file=None,
+        clerk_secret_key="sk_test_existing_user",
+        frontend_origins="http://localhost:3000",
+    )
+
+    invitation = asyncio.run(
+        ClerkInvitationProvider(settings).create_invitation(email="existing@example.com")
+    )
+
+    request = captured_request["value"]
+    assert request.email_address == "existing@example.com"  # type: ignore[attr-defined]
+    assert request.ignore_existing is True  # type: ignore[attr-defined]
+    assert request.notify is True  # type: ignore[attr-defined]
+    assert invitation.invitation_id == "inv_existing_user"
 
 
 def _create_session(client: TestClient, token: str, **body: Any) -> dict[str, Any]:
@@ -3184,16 +3229,20 @@ def test_admin_onboards_invites_revokes_and_reinvites_a_customer(api: ApiHarness
     assert customer["external_ref"].startswith("CUS-")
     assert customer["email"] == "devika@example.com"
     assert customer["access"]["email"] == "devika@example.com"
-    assert customer["access"]["status"] == "pending"
-    assert customer["access"]["is_active"] is True
-    assert customer["access"]["invited_at"] is not None
-    assert customer["access"]["expires_at"] is not None
+    assert customer["access"]["status"] == "queued"
+    assert customer["access"]["is_active"] is False
+    assert customer["access"]["invited_at"] is None
+    assert customer["access"]["expires_at"] is None
     assert customer["access"]["accepted_at"] is None
     assert {event["action"] for event in customer["recent_audit_events"]} == {
         "customer.created",
-        "customer.access_invitation_sent",
     }
     assert provider.calls == [("create", "devika@example.com")]
+    assert _query_one(
+        api.database_path,
+        "SELECT invitation_status, clerk_invitation_id, is_active FROM users WHERE customer_id = ?",
+        (customer_id,),
+    ) == ("pending", "inv_test_1", 1)
 
     duplicate = api.client.post(
         "/v1/customers",
@@ -3245,7 +3294,6 @@ def test_customer_creation_is_retained_and_invitation_is_queued_when_clerk_fails
     )
 
     assert created.status_code == 201, created.text
-    assert created.headers["retry-after"] == "17"
     assert created.json()["access"]["status"] == "queued"
     assert created.json()["access"]["is_active"] is False
     assert created.json()["recent_audit_events"][0]["action"] == "customer.created"
