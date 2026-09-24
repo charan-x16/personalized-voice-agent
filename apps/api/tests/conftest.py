@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from svara_api.api.routes import voice as voice_routes
 from svara_api.config import Settings
+from svara_api.domains.voice import router as voice_routes
 from svara_api.main import create_app
 
 TEST_SESSION_SECRET = "test-session-secret-that-is-not-used-outside-tests"

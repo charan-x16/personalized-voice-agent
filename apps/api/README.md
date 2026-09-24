@@ -19,7 +19,8 @@ On PowerShell, use `if (-not (Test-Path .env)) { Copy-Item .env.example .env }` 
 
 ## Run the wired web flow
 
-Keep the API running, then create `.env.local` at the repository root with the server-only backend address:
+Keep the API running, then create `apps/web/.env.local` at the repository root
+with the server-only backend address:
 
 ```text
 API_BASE_URL=http://127.0.0.1:8000

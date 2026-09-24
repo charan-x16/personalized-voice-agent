@@ -10,6 +10,7 @@ from .agent_configuration import (
     DEFAULT_AGENT_OPENING_MESSAGE,
     DEFAULT_AGENT_TONE,
 )
+from .domains.tools.catalog import provision_default_tool_catalog
 from .models import (
     CafeTable,
     Customer,
@@ -20,7 +21,6 @@ from .models import (
     Tenant,
     User,
 )
-from .services.tool_catalog import provision_default_tool_catalog
 
 DEMO_TENANT_ID = "00000000-0000-4000-8000-000000000001"
 DEMO_CUSTOMER_ID = "00000000-0000-4000-8000-000000000002"

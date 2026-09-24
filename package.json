@@ -1,34 +1,22 @@
 {
-  "name": "svara-voice-platform",
+  "name": "svara-platform",
   "version": "0.1.0",
   "private": true,
   "engines": {
     "node": ">=22.15.0"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
-    "test:unit": "node --experimental-strip-types --test tests/frontend/voice-lifecycle.test.mjs tests/frontend/customer-management.test.mjs tests/frontend/customer-bff-routes.test.mjs tests/frontend/frontend-refinements.test.mjs tests/frontend/clerk-auth.test.mjs"
-  },
-  "dependencies": {
-    "@clerk/nextjs": "^7.9.1",
-    "@fontsource-variable/instrument-sans": "latest",
-    "@fontsource-variable/newsreader": "latest",
-    "lucide-react": "latest",
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest"
-  },
-  "devDependencies": {
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "eslint": "^9.0.0",
-    "eslint-config-next": "latest",
-    "typescript": "^6.0.0"
+    "dev": "pnpm --filter @svara/web dev",
+    "build": "pnpm --filter @svara/web build",
+    "lint": "pnpm --filter @svara/web lint",
+    "typecheck": "pnpm --filter @svara/web typecheck",
+    "test:unit": "pnpm --filter @svara/web test:unit",
+    "test:web": "pnpm --filter @svara/web test:unit",
+    "test:api": "uv run --directory apps/api pytest",
+    "api:export-openapi": "uv run --directory apps/api python scripts/export_openapi.py",
+    "api:check-openapi": "uv run --directory apps/api python scripts/export_openapi.py --check",
+    "check": "pnpm typecheck && pnpm lint && pnpm test:web && pnpm test:api && pnpm api:check-openapi && pnpm build",
+    "dev:api": "uv run --directory apps/api uvicorn svara_api.main:app --reload"
   },
   "packageManager": "pnpm@11.9.0"
 }

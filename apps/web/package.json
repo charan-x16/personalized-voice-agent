@@ -1,0 +1,35 @@
+{
+  "name": "@svara/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.15.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "node --experimental-strip-types --test tests/voice-lifecycle.test.mjs tests/customer-management.test.mjs tests/customer-bff-routes.test.mjs tests/frontend-refinements.test.mjs tests/clerk-auth.test.mjs"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^7.9.1",
+    "@fontsource-variable/instrument-sans": "latest",
+    "@fontsource-variable/newsreader": "latest",
+    "lucide-react": "latest",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "latest",
+    "typescript": "^6.0.0"
+  },
+  "packageManager": "pnpm@11.9.0"
+}

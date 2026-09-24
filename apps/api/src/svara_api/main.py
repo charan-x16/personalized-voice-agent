@@ -7,10 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api.router import api_router
 from .config import Settings, get_settings
 from .database import Database
+from .integrations.clerk.invitations import build_invitation_provider
+from .integrations.sarvam.provider import build_voice_provider
 from .middleware import RequestBodyLimitMiddleware
 from .seed import seed_demo_data
-from .services.clerk_invitations import build_invitation_provider
-from .services.voice_provider import build_voice_provider
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

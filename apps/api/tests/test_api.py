@@ -32,9 +32,19 @@ from svara_api.agent_configuration import (
     is_supported_opening_message_template,
     render_opening_message,
 )
-from svara_api.api.routes import voice as voice_routes
 from svara_api.config import Settings
 from svara_api.database import Database, get_db
+from svara_api.domains.voice import router as voice_routes
+from svara_api.integrations.clerk.invitations import (
+    AccessInvitation,
+    InvitationProviderError,
+)
+from svara_api.integrations.clerk.outbox import process_ready_invitation_jobs
+from svara_api.integrations.sarvam.provider import (
+    SarvamVoiceProvider,
+    VoiceProviderSession,
+    VoiceProviderTerminationError,
+)
 from svara_api.main import create_app
 from svara_api.models import Base, VoiceSession, new_id
 from svara_api.schemas import RuntimeAgentConfiguration
@@ -48,16 +58,6 @@ from svara_api.seed import (
     DEMO_ADMIN_USER_ID,
     DEMO_CUSTOMER_ID,
     DEMO_USER_ID,
-)
-from svara_api.services.clerk_invitations import (
-    AccessInvitation,
-    InvitationProviderError,
-)
-from svara_api.services.invitation_outbox import process_ready_invitation_jobs
-from svara_api.services.voice_provider import (
-    SarvamVoiceProvider,
-    VoiceProviderSession,
-    VoiceProviderTerminationError,
 )
 
 from .conftest import (

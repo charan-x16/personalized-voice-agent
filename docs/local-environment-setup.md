@@ -2,7 +2,7 @@
 
 The two processes read different files:
 
-- Next.js reads `.env.local` at the repository root. Keep `API_BASE_URL`,
+- Next.js reads `apps/web/.env.local`. Keep `API_BASE_URL`,
   `APP_ORIGIN`, `VOICE_WEBSOCKET_HOSTS`, the Clerk publishable/secret keys, and
   Clerk route settings there. Never prefix `CLERK_SECRET_KEY` with
   `NEXT_PUBLIC_`. Keep `APP_ENV` aligned with the backend if changing modes.
@@ -11,7 +11,7 @@ The two processes read different files:
   `CLERK_SECRET_KEY` in `apps/api/.env`.
 
 No additional runtime `.env` files are required. The repository-root
-`.env.example` documents only Next.js variables, while
+`apps/web/.env.example` documents only Next.js variables, while
 `apps/api/.env.example` documents only FastAPI variables.
 
 Restart both processes after environment changes. Both files must remain ignored
@@ -67,7 +67,7 @@ Use the Clerk CLI to merge the linked development keys into both runtime files
 without printing them:
 
 ```bash
-clerk env pull --file .env.local
+clerk env pull --file apps/web/.env.local
 clerk env pull --file apps/api/.env
 ```
 

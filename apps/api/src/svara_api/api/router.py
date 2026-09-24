@@ -1,18 +1,15 @@
 from fastapi import APIRouter
 
-from .routes import (
-    auth,
-    conversations,
-    customers,
-    health,
-    profile,
-    reservation_tools,
-    sarvam,
-    tools,
-    voice,
-    voice_stream,
-    webhooks,
-)
+from ..domains.conversations import router as conversations
+from ..domains.customers import router as customers
+from ..domains.health import router as health
+from ..domains.identity import auth, profile
+from ..domains.reservations import router as reservation_tools
+from ..domains.tools import router as tools
+from ..domains.voice import router as voice
+from ..domains.voice import stream as voice_stream
+from ..integrations.clerk import router as webhooks
+from ..integrations.sarvam import router as sarvam
 
 api_router = APIRouter()
 api_router.include_router(health.router)
